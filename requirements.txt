@@ -7,3 +7,5 @@ scipy~=1.12.0
 torch~=2.1.2
 torchtext~=0.16.2
 transformers~=4.37.0
+essentia=2.1b6.dev1110
+mir_eval=0.7
