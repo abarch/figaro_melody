@@ -1,18 +1,75 @@
-# np only used in mp3 export so far
-# import numpy as np
-
+import glob
 import os
 from pathlib import Path
-import glob
 
 import essentia.standard as es
+import numpy as np
 import pretty_midi
 
-from mir_eval.sonify import pitch_contour
+from input_representation import InputRepresentation
 
-SAMPLE_RATE=44100.0
-OUT_ROOT='extraction_examples/essentia_melodia'
+SAMPLE_RATE = 44100.0
+OUT_ROOT = 'extraction_examples/essentia_melodia'
 
+def extract_from_midi_to_midi(file_path):
+    rep = InputRepresentation(file_path)
+    # pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
+    pm_original = rep.pm
+
+    synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
+    eqloud = es.EqualLoudness()  # recommended as preprocessing for melody extraction
+    audio_data = eqloud(synth)  # Input für essentia
+
+    melody_extractor = es.PredominantPitchMelodia(frameSize=2048, hopSize=128)
+    pitch_values, pitch_confidence = melody_extractor(audio_data)
+
+    # Pitch values to pm
+    onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
+    # print("MIDI notes:", notes) # Midi pitch number
+
+    instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
+    pm_melody = pretty_midi.PrettyMIDI()
+    for pitch, onset, duration in zip(notes, onsets, durations):
+        # NOTE velocity = 100 is a default value that is negligible for this scenario
+        # TODO use velocity from input if input is midi -> add input representation as parameter!
+        # Velocity ist in note_items gespeichert
+        note = pretty_midi.Note(velocity=100, pitch=int(pitch), start=onset, end=onset + duration)
+        instrument.notes.append(note)
+    pm_melody.instruments.append(instrument)
+
+    # Compute residual
+    pm_original.adjust_times(pm_original.time_signature_changes, pm_melody.time_signature_changes)
+
+    # Type: Note
+    melody_notes = pm_melody.instruments[0].notes  # Contains start, end, pitch, velocity
+    # Type: Item
+    original_nodes = rep.note_items  # Contains start, end, velocity, pitch
+
+    # Copy original pm
+    pm_residual = pretty_midi.PrettyMIDI()
+    pm_residual.instruments.extend(pm_original.instruments)
+    pm_residual.time_signature_changes.extend(pm_original.time_signature_changes)
+    pm_residual.resolution = pm_original.resolution
+    pm_residual.key_signature_changes.extend(pm_original.key_signature_changes)
+
+    time_thresh = 1
+    pitch_thresh = 1
+    for m_note_idx in range(len(melody_notes)):
+        for o_note_idx in range(len(original_nodes)):
+            m_note = melody_notes[m_note_idx]
+            o_note = melody_notes[o_note_idx]
+            # Assumes that there is only one track
+            if abs(m_note.pitch - o_note.pitch) < pitch_thresh and (m_note-o_note) < time_thresh:
+                # Remove fitting note
+                pm_residual.instruments[0].notes[o_note_idx] = 0
+                break
+
+    # TODO Save residual
+
+    # Save to midi file
+    out_path = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
+    pm_melody.write(out_path)
+    print('Result written to', out_path)
 
 def extract_from_mp3_to_midi(file_path):
     print('Processing', file_path)
@@ -28,31 +85,7 @@ def extract_from_mp3_to_midi(file_path):
     melody_extractor = es.PredominantPitchMelodia(frameSize=2048, hopSize=128)
     pitch_values, pitch_confidence = melody_extractor(audio_data)
 
-
-    ######################################################################
-    ##### Export as MIDI
-    onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
-    # print("MIDI notes:", notes) # Midi pitch number
-    # print("MIDI note onsets:", onsets)
-    # print("MIDI note durations:", durations)
-
-    instrument = pretty_midi.Instrument(program=0) # = 'Acoustic Grand Piano'
-
-    pm = pretty_midi.PrettyMIDI()
-    for pitch, onset, duration in zip(notes, onsets, durations):
-        # NOTE velocity = 100 is a default value that is negligible for this scenario
-        note = pretty_midi.Note(velocity=100, pitch=int(pitch), start=onset, end=onset + duration)
-        instrument.notes.append(note)
-
-    pm.instruments.append(instrument)
-    out_path = f'{OUT_ROOT}/{Path(file_path).stem}.mid'
-    pm.write(out_path)
-
-    print('Result written to', out_path)
-
-    ######################################################################
-
-
+    export_to_midi(audio_data, file_path, pitch_values)
 
     # ######################################################################
     # ##### Export as raw audio
@@ -62,16 +95,31 @@ def extract_from_mp3_to_midi(file_path):
     # synthesized_melody = pitch_contour(pitch_times, pitch_values, SAMPLE_RATE).astype(np.float32)[:len(audio)]
     # # NOTE Der StereoMuxer mixt Original-Audio und Melodie zusammen
     # es.AudioWriter(filename='extraction_examples/essentia_melodia/' + base_name + '.mp3', format='mp3')(es.StereoMuxer()(audio, synthesized_melody))
-
     # ######################################################################
 
+def export_to_midi(audio_data, file_path, pitch_values):
+    onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
+    # print("MIDI notes:", notes) # Midi pitch number
+    # print("MIDI note onsets:", onsets)
+    # print("MIDI note durations:", durations)
+    instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
+    pm_melody = pretty_midi.PrettyMIDI()
+    for pitch, onset, duration in zip(notes, onsets, durations):
+        # NOTE velocity = 100 is a default value that is negligible for this scenario
+        note = pretty_midi.Note(velocity=100, pitch=int(pitch), start=onset, end=onset + duration)
+        instrument.notes.append(note)
+    pm_melody.instruments.append(instrument)
 
+    out_path = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
+    pm_melody.write(out_path)
+    print('Result written to', out_path)
 
 def process_folder(folder):
-    # input_files=glob.glob(os.path.join('extraction_examples/inputs/', '**/*.mp3'), recursive=True)
-    input_files = glob.glob(os.path.join(folder, '**/*.mp3'), recursive=True)
+    # input_files = glob.glob(os.path.join(folder, '**/*.mp3'), recursive=True)
+    input_files = glob.glob(os.path.join(folder, '**/*.mid'), recursive=True)
     for file_path in input_files:
-        extract_from_mp3_to_midi(file_path)
+        # extract_from_mp3_to_midi(file_path)
+        extract_from_midi_to_midi(file_path)
 
 def main():
     process_folder('extraction_examples/inputs/')

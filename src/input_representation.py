@@ -42,6 +42,7 @@ class Item(object):
     self.pitch = pitch
     self.instrument = instrument
 
+  # NOTE Item name in [Note, Chord, Pedal, Tempo, Melody, Residual]
   def __repr__(self):
     return 'Item(name={}, start={}, end={}, velocity={}, pitch={}, instrument={})'.format(
       self.name, self.start, self.end, self.velocity, self.pitch, self.instrument)
@@ -285,6 +286,39 @@ class InputRepresentation():
   def tick_to_position(self, tick):
     return round(tick / self.pm.resolution * DEFAULT_POS_PER_QUARTER)
 
+  def _process_note_items(self, events, item):
+    # instrument
+    if item.instrument == 'drum':
+      name = 'drum'
+    else:
+      name = pretty_midi.program_to_instrument_name(item.instrument)
+    events.append(Event(
+      name=INSTRUMENT_KEY,
+      time=item.start,
+      value=name,
+      text='{}'.format(name)))
+    # pitch
+    events.append(Event(
+      name=PITCH_KEY,
+      time=item.start,
+      value='drum_{}'.format(item.pitch) if name == 'drum' else item.pitch,
+      text='{}'.format(pretty_midi.note_number_to_name(item.pitch))))
+    # velocity
+    velocity_index = np.argmin(abs(DEFAULT_VELOCITY_BINS - item.velocity))
+    events.append(Event(
+      name=VELOCITY_KEY,
+      time=item.start,
+      value=velocity_index,
+      text='{}/{}'.format(item.velocity, DEFAULT_VELOCITY_BINS[velocity_index])))
+    # duration
+    duration = self.tick_to_position(item.end - item.start)
+    index = np.argmin(abs(DEFAULT_DURATION_BINS - duration))
+    events.append(Event(
+      name=DURATION_KEY,
+      time=item.start,
+      value=index,
+      text='{}/{}'.format(duration, DEFAULT_DURATION_BINS[index])))
+
   # item to event
   def get_remi_events(self):
     events = []
@@ -350,39 +384,9 @@ class InputRepresentation():
           value='{}'.format(index),
           text='{}/{}'.format(index+1, positions_per_bar))
 
-        if item.name == 'Note':
+        if item.name in ['Note', 'Melody', 'Residual']:
           events.append(pos_event)
-          # instrument
-          if item.instrument == 'drum':
-            name = 'drum'
-          else:
-            name = pretty_midi.program_to_instrument_name(item.instrument)
-          events.append(Event(
-            name=INSTRUMENT_KEY,
-            time=item.start, 
-            value=name,
-            text='{}'.format(name)))
-          # pitch
-          events.append(Event(
-            name=PITCH_KEY,
-            time=item.start, 
-            value='drum_{}'.format(item.pitch) if name == 'drum' else item.pitch,
-            text='{}'.format(pretty_midi.note_number_to_name(item.pitch))))
-          # velocity
-          velocity_index = np.argmin(abs(DEFAULT_VELOCITY_BINS - item.velocity))
-          events.append(Event(
-            name=VELOCITY_KEY,
-            time=item.start, 
-            value=velocity_index,
-            text='{}/{}'.format(item.velocity, DEFAULT_VELOCITY_BINS[velocity_index])))
-          # duration
-          duration = self.tick_to_position(item.end - item.start)
-          index = np.argmin(abs(DEFAULT_DURATION_BINS-duration))
-          events.append(Event(
-            name=DURATION_KEY,
-            time=item.start,
-            value=index,
-            text='{}/{}'.format(duration, DEFAULT_DURATION_BINS[index])))
+          self._process_note_items(events, item)
         elif item.name == 'Chord':
           if current_chord is None or item.pitch != current_chord.pitch:
             events.append(pos_event)
