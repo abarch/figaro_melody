@@ -37,13 +37,10 @@ def extract_from_midi_to_midi(file_path):
         instrument.notes.append(note)
     pm_melody.instruments.append(instrument)
 
-    # Compute residual
-    pm_original.adjust_times(pm_original.time_signature_changes, pm_melody.time_signature_changes)
+    rep_melody = InputRepresentation(pm_melody)
 
-    # Type: Note
-    melody_notes = pm_melody.instruments[0].notes  # Contains start, end, pitch, velocity
-    # Type: Item
-    original_nodes = rep.note_items  # Contains start, end, velocity, pitch
+    # Compute residual
+
 
     # Copy original pm
     pm_residual = pretty_midi.PrettyMIDI()
@@ -51,25 +48,37 @@ def extract_from_midi_to_midi(file_path):
     pm_residual.time_signature_changes.extend(pm_original.time_signature_changes)
     pm_residual.resolution = pm_original.resolution
     pm_residual.key_signature_changes.extend(pm_original.key_signature_changes)
+    rep_residual = InputRepresentation(pm_residual)
 
+    # Type: Item
+    # Contains start, end, velocity, pitch
+    melody_notes = rep_melody.note_items
+    original_notes = rep_residual.note_items
+
+    # TODO MAIN Tweak the thresholds
     time_thresh = 1
     pitch_thresh = 1
+
+    removed_note_idx = 0
     for m_note_idx in range(len(melody_notes)):
-        for o_note_idx in range(len(original_nodes)):
+        for o_note_idx in range(removed_note_idx, len(original_notes)):
             m_note = melody_notes[m_note_idx]
-            o_note = melody_notes[o_note_idx]
+            o_note = original_notes[o_note_idx]
             # Assumes that there is only one track
-            if abs(m_note.pitch - o_note.pitch) < pitch_thresh and (m_note-o_note) < time_thresh:
+            if abs(m_note.pitch - o_note.pitch) < pitch_thresh and (m_note.start-o_note.start) < time_thresh:
                 # Remove fitting note
-                pm_residual.instruments[0].notes[o_note_idx] = 0
+                o_note.pitch = 0
+                removed_note_idx = o_note_idx
                 break
 
-    # TODO Save residual
-
     # Save to midi file
-    out_path = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
-    pm_melody.write(out_path)
-    print('Result written to', out_path)
+    out_path_mel = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
+    pm_melody.write(out_path_mel)
+    print('Melody result written to', out_path_mel)
+
+    out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual.mid'
+    pm_residual.write(out_path_res)
+    print('Residual result written to', out_path_res)
 
 def extract_from_mp3_to_midi(file_path):
     print('Processing', file_path)
