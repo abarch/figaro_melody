@@ -6,6 +6,8 @@ import essentia.standard as es
 import numpy as np
 import pretty_midi
 
+from copy import deepcopy
+
 from input_representation import InputRepresentation
 
 SAMPLE_RATE = 44100.0
@@ -16,16 +18,16 @@ def extract_from_midi_to_midi(file_path):
     # pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
     pm_original = rep.pm
 
-    synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
+    # synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
+    synth = pm_original.synthesize().astype(np.float32)
     eqloud = es.EqualLoudness()  # recommended as preprocessing for melody extraction
-    audio_data = eqloud(synth)  # Input für essentia
+    audio_data = eqloud(synth)
 
-    melody_extractor = es.PredominantPitchMelodia(frameSize=2048, hopSize=128)
+    melody_extractor = es.PredominantPitchMelodia(frameSize=2048, hopSize=128, guessUnvoiced=True)
     pitch_values, pitch_confidence = melody_extractor(audio_data)
 
     # Pitch values to pm
     onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
-    # print("MIDI notes:", notes) # Midi pitch number
 
     instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
     pm_melody = pretty_midi.PrettyMIDI()
@@ -43,33 +45,44 @@ def extract_from_midi_to_midi(file_path):
 
 
     # Copy original pm
-    pm_residual = pretty_midi.PrettyMIDI()
-    pm_residual.instruments.extend(pm_original.instruments)
-    pm_residual.time_signature_changes.extend(pm_original.time_signature_changes)
-    pm_residual.resolution = pm_original.resolution
-    pm_residual.key_signature_changes.extend(pm_original.key_signature_changes)
-    rep_residual = InputRepresentation(pm_residual)
+    # pm_residual = pretty_midi.PrettyMIDI()
+    # pm_residual.instruments.extend(pm_original.instruments)
+    # pm_residual.time_signature_changes.extend(pm_original.time_signature_changes)
+    # pm_residual.resolution = pm_original.resolution
+    # pm_residual.key_signature_changes.extend(pm_original.key_signature_changes)
+    # rep_residual = InputRepresentation(pm_residual)
+    rep_residual = deepcopy(rep)
 
     # Type: Item
     # Contains start, end, velocity, pitch
     melody_notes = rep_melody.note_items
-    original_notes = rep_residual.note_items
+    residual_notes = rep_residual.note_items
 
     # TODO MAIN Tweak the thresholds
-    time_thresh = 1
-    pitch_thresh = 1
+    time_thresh = 100
+    pitch_thresh = 10
 
-    removed_note_idx = 0
-    for m_note_idx in range(len(melody_notes)):
-        for o_note_idx in range(removed_note_idx, len(original_notes)):
-            m_note = melody_notes[m_note_idx]
-            o_note = original_notes[o_note_idx]
-            # Assumes that there is only one track
-            if abs(m_note.pitch - o_note.pitch) < pitch_thresh and (m_note.start-o_note.start) < time_thresh:
+    removed_note_idx = 1
+    processed_o_notes=0
+    removed_notes=0
+    condition = lambda m_note, r_note: r_note.instrument != 'drum' and \
+        abs(m_note.pitch - r_note.pitch) < pitch_thresh and \
+        abs(m_note.start-r_note.start) < time_thresh and \
+        abs(m_note.end-r_note.end) < time_thresh
+    for m_note_idx, m_note in enumerate(melody_notes):
+        for r_note_idx, r_note in enumerate(residual_notes[:]):
+            processed_o_notes+=1
+            if condition(m_note, r_note):
                 # Remove fitting note
-                o_note.pitch = 0
-                removed_note_idx = o_note_idx
-                break
+                residual_notes.remove(r_note)
+                removed_notes+=1
+                removed_note_idx = r_note_idx
+
+    print('Processed notes', processed_o_notes)
+    print('Removed notes', removed_notes)
+    
+    print('len(residual_notes) after processing', len(residual_notes))
+
 
     # Save to midi file
     out_path_mel = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
@@ -77,7 +90,7 @@ def extract_from_midi_to_midi(file_path):
     print('Melody result written to', out_path_mel)
 
     out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual.mid'
-    pm_residual.write(out_path_res)
+    rep_residual.pm.write(out_path_res)
     print('Residual result written to', out_path_res)
 
 def extract_from_mp3_to_midi(file_path):
@@ -100,9 +113,7 @@ def extract_from_mp3_to_midi(file_path):
     # ##### Export as raw audio
     # # Pitch is estimated on frames. Compute frame time positions.
     # pitch_times = np.linspace(0.0,len(audio)/SAMPLE_RATE,len(pitch_values) )
-    # # Essentia operates with float32 ndarrays instead of float64, so let's cast it.
     # synthesized_melody = pitch_contour(pitch_times, pitch_values, SAMPLE_RATE).astype(np.float32)[:len(audio)]
-    # # NOTE Der StereoMuxer mixt Original-Audio und Melodie zusammen
     # es.AudioWriter(filename='extraction_examples/essentia_melodia/' + base_name + '.mp3', format='mp3')(es.StereoMuxer()(audio, synthesized_melody))
     # ######################################################################
 
