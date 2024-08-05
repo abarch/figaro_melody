@@ -8,29 +8,25 @@ import pretty_midi
 
 from copy import deepcopy
 
-from input_representation import InputRepresentation
-
 SAMPLE_RATE = 44100.0
 OUT_ROOT = 'extraction_examples/essentia_melodia'
 
 def extract_from_midi_to_midi(file_path):
-    rep = InputRepresentation(file_path)
-    # pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
-    pm_original = rep.pm
+    pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
 
     # synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
     synth = pm_original.synthesize().astype(np.float32)
     eqloud = es.EqualLoudness()  # recommended as preprocessing for melody extraction
     audio_data = eqloud(synth)
 
-    melody_extractor = es.PredominantPitchMelodia(frameSize=2048, hopSize=128, guessUnvoiced=True)
+    melody_extractor = es.PredominantPitchMelodia(guessUnvoiced=True)
     pitch_values, pitch_confidence = melody_extractor(audio_data)
 
     # Pitch values to pm
     onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
 
-    instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
     pm_melody = pretty_midi.PrettyMIDI()
+    instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
     for pitch, onset, duration in zip(notes, onsets, durations):
         # NOTE velocity = 100 is a default value that is negligible for this scenario
         # TODO use velocity from input if input is midi -> add input representation as parameter!
@@ -38,8 +34,6 @@ def extract_from_midi_to_midi(file_path):
         note = pretty_midi.Note(velocity=100, pitch=int(pitch), start=onset, end=onset + duration)
         instrument.notes.append(note)
     pm_melody.instruments.append(instrument)
-
-    rep_melody = InputRepresentation(pm_melody)
 
     # Compute residual
 
@@ -50,47 +44,55 @@ def extract_from_midi_to_midi(file_path):
     # pm_residual.time_signature_changes.extend(pm_original.time_signature_changes)
     # pm_residual.resolution = pm_original.resolution
     # pm_residual.key_signature_changes.extend(pm_original.key_signature_changes)
-    # rep_residual = InputRepresentation(pm_residual)
-    rep_residual = deepcopy(rep)
 
-    # Type: Item
-    # Contains start, end, velocity, pitch
-    melody_notes = rep_melody.note_items
-    residual_notes = rep_residual.note_items
+    melody_notes = pm_melody.instruments[0].notes  # melody only contains 1 instrument
+    pm_residual = deepcopy(pm_original)
+
+    # print('len(melody_notes)', len(melody_notes))
+    # print('len(residual_notes)', len(residual_notes))
 
     # TODO MAIN Tweak the thresholds
-    time_thresh = 100
-    pitch_thresh = 10
+    time_thresh_start = 1  # 100
+    time_thresh_end = 1
+    pitch_thresh = 4  # 10
 
-    removed_note_idx = 1
-    processed_o_notes=0
-    removed_notes=0
-    condition = lambda m_note, r_note: r_note.instrument != 'drum' and \
-        abs(m_note.pitch - r_note.pitch) < pitch_thresh and \
-        abs(m_note.start-r_note.start) < time_thresh and \
-        abs(m_note.end-r_note.end) < time_thresh
-    for m_note_idx, m_note in enumerate(melody_notes):
-        for r_note_idx, r_note in enumerate(residual_notes[:]):
-            processed_o_notes+=1
-            if condition(m_note, r_note):
-                # Remove fitting note
-                residual_notes.remove(r_note)
-                removed_notes+=1
-                removed_note_idx = r_note_idx
+    processed_orig_notes = 0
+    removed_notes = 0
 
-    print('Processed notes', processed_o_notes)
+    # Condition for keeping the elements
+    def _filter_condition(melody_note, orig_note):
+        return abs(melody_note.pitch - orig_note.pitch) >= pitch_thresh and \
+                abs(melody_note.start-orig_note.start) > time_thresh_start and \
+                abs(melody_note.end-orig_note.end) > time_thresh_end
+
+    for instr in pm_residual.instruments:
+        if not instr.is_drum:
+            note_len_before = len(instr.notes)
+            processed_orig_notes += note_len_before
+            notes_to_keep = set()
+            # Remember the index of the position the melody note was found in the original song
+            # to reduce number of iterations
+            found_mel_note_idx = 0
+            for m_note_idx, m_note in enumerate(melody_notes):
+                for o_note_idx, o_note in enumerate(instr.notes[found_mel_note_idx:], start=found_mel_note_idx):
+                    if _filter_condition(melody_note=m_note, orig_note=o_note):
+                        notes_to_keep.add(o_note_idx)
+                        found_mel_note_idx = o_note_idx
+                        break
+            instr.notes = list(np.array(instr.notes)[list(notes_to_keep)])
+            # NOTE Just for debugging
+            removed_notes += (note_len_before - len(instr.notes))
+
+    print('Processed notes', processed_orig_notes)
     print('Removed notes', removed_notes)
-    
-    print('len(residual_notes) after processing', len(residual_notes))
-
 
     # Save to midi file
     out_path_mel = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
     pm_melody.write(out_path_mel)
     print('Melody result written to', out_path_mel)
 
-    out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual.mid'
-    rep_residual.pm.write(out_path_res)
+    out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid'
+    pm_residual.write(out_path_res)
     print('Residual result written to', out_path_res)
 
 def extract_from_mp3_to_midi(file_path):
@@ -103,8 +105,7 @@ def extract_from_mp3_to_midi(file_path):
     # print(len(audio)/SAMPLE_RATE)
 
     # Extract melody as pitch values
-    # TODO Tweak params
-    melody_extractor = es.PredominantPitchMelodia(frameSize=2048, hopSize=128)
+    melody_extractor = es.PredominantPitchMelodia(guessUnvoiced=True)
     pitch_values, pitch_confidence = melody_extractor(audio_data)
 
     export_to_midi(audio_data, file_path, pitch_values)
