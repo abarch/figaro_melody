@@ -6,6 +6,7 @@ import os
 import glob
 
 import pytorch_lightning as pl
+from transformers.models.bert.modeling_bert import BertAttention
 
 from models.seq2seq import Seq2SeqModule
 from models.vae import VqVaeModule
@@ -45,6 +46,35 @@ if device.type == 'cuda':
   N_WORKERS = min(N_WORKERS, 8*torch.cuda.device_count())
 N_WORKERS = int(N_WORKERS)
 
+# -----------------------------------
+# from generate.py
+def load_old_or_new_checkpoint(model_class, checkpoint):
+  # assuming transformers>=4.36.0
+  pl_ckpt = torch.load(checkpoint, map_location="cpu")
+  kwargs = pl_ckpt['hyper_parameters']
+  if 'flavor' in kwargs:
+    del kwargs['flavor']
+  if 'vae_run' in kwargs:
+    del kwargs['vae_run']
+  model = model_class(**kwargs)
+  state_dict = pl_ckpt['state_dict']
+  # position_ids are no longer saved in the state_dict starting with transformers==4.31.0
+  state_dict = {k: v for k, v in state_dict.items() if not k.endswith('embeddings.position_ids')}
+  try:
+    # succeeds for checkpoints trained with transformers>4.13.0
+    model.load_state_dict(state_dict)
+  except RuntimeError:
+    # work around a breaking change introduced in transformers==4.13.0, which fixed the position_embedding_type of cross-attention modules "absolute"
+    config = model.transformer.decoder.bert.config
+    for layer in model.transformer.decoder.bert.encoder.layer:
+      layer.crossattention = BertAttention(config, position_embedding_type=config.position_embedding_type)
+    model.load_state_dict(state_dict)
+  if model_class == VqVaeModule:
+    model.cpu()
+  model.freeze()
+  model.eval()
+  return model
+# -----------------------------------
 
 def main():
   ### Define available models ###
@@ -80,10 +110,11 @@ def main():
   MAX_CONTEXT = min(1024, CONTEXT_SIZE)
 
   if MODEL in ['figaro-learned', 'figaro'] and VAE_CHECKPOINT:
-    vae_module = VqVaeModule.load_from_checkpoint(checkpoint_path=VAE_CHECKPOINT)
-    vae_module.cpu()
-    vae_module.freeze()
-    vae_module.eval()
+    # vae_module = VqVaeModule.load_from_checkpoint(checkpoint_path=VAE_CHECKPOINT)
+    # vae_module.cpu()
+    # vae_module.freeze()
+    # vae_module.eval()
+    vae_module = load_old_or_new_checkpoint(VqVaeModule, CHECKPOINT)
 
   else:
     vae_module = None
@@ -107,7 +138,8 @@ def main():
       'figaro-no-meta': Seq2SeqModule,
       'baseline': Seq2SeqModule,
     }[MODEL]
-    model = model_class.load_from_checkpoint(checkpoint_path=CHECKPOINT)
+    model = load_old_or_new_checkpoint(model_class=model_class, checkpoint=CHECKPOINT)
+    # model = model_class.load_from_checkpoint(checkpoint_path=CHECKPOINT)
 
   else:
     seq2seq_kwargs = {
