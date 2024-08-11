@@ -40,6 +40,8 @@ VELOCITY_KEY = 'Velocity'
 DURATION_KEY = 'Duration'
 TEMPO_KEY = 'Tempo'
 CHORD_KEY = 'Chord'
+MELODY_INSTRUMENT_KEY = 'Melody Instrument'
+MELODY_NOTE_KEY = 'Melody Note'
 
 NOTE_DENSITY_KEY = 'Note Density'
 MEAN_PITCH_KEY = 'Mean Pitch'

@@ -12,7 +12,7 @@ from vocab import RemiVocab, DescriptionVocab
 from constants import (
   PAD_TOKEN, BOS_TOKEN, EOS_TOKEN, BAR_KEY, POSITION_KEY,
   TIME_SIGNATURE_KEY, INSTRUMENT_KEY, CHORD_KEY,
-  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY
+  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY, MELODY_NOTE_KEY, MELODY_INSTRUMENT_KEY
 )
 
 
@@ -408,7 +408,7 @@ class MidiDataset(IterableDataset):
     eos_event = torch.tensor(self.vocab.encode([EOS_TOKEN]), dtype=torch.long)
     return bos_event, eos_event
 
-  def preprocess_description(self, desc, instruments=True, chords=True, meta=True):
+  def preprocess_description(self, desc, instruments=True, chords=True, meta=True, separated_melody=False):
     valid_keys = {
       BAR_KEY: True,
       INSTRUMENT_KEY: instruments,
@@ -418,6 +418,8 @@ class MidiDataset(IterableDataset):
       MEAN_PITCH_KEY: meta,
       MEAN_VELOCITY_KEY: meta,
       MEAN_DURATION_KEY: meta,
+      MELODY_INSTRUMENT_KEY: separated_melody,
+      MELODY_NOTE_KEY: separated_melody
     }
     return [token for token in desc if len(token.split('_')) == 0 or valid_keys[token.split('_')[0]]]
 
@@ -432,10 +434,25 @@ class MidiDataset(IterableDataset):
     except Exception:
       # If there's no cached version, compute the representations
       try:
-        rep = InputRepresentation(file, strict=True)
+        if self.description_options['separated_melody']:  # Needs to hold for every file if True!
+          # if the predominant melody is separated, load the appropriate file as well
+          melody_file = None
+          # if file ends with _residual, add its melody as second file
+          if name.endswith('_residual.mid'):
+            melody_file = name.replace(__old='_residual.mid', __new='_melody.mid')
+          # if file ends with _melody, skip it as it is already processed above
+          elif name.endswith('_melody.mid'):
+            pass
+          # else:
+          #   print('Unkown file found!', name)
+          rep = InputRepresentation(file, strict=True, melody_file=melody_file)
+        else:
+          rep = InputRepresentation(file, strict=True)
+
         events = rep.get_remi_events()
         description = rep.get_description()
       except Exception as err:
+        # Or if melody file is not found
         raise ValueError(f'Unable to load file {file}') from err
 
       sample = {
@@ -459,7 +476,6 @@ class MidiDataset(IterableDataset):
       opts = self.description_options
       kwargs = { key: opts[key] for key in ['instruments', 'chords', 'meta'] if key in opts }
       sample['description'] = self.preprocess_description(sample['description'], **self.description_options)
-    
     return sample
 
   def get_latent_representation(self, events, cache_key=None, bar_token_mask='<mask>'):

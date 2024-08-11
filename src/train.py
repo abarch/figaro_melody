@@ -84,6 +84,7 @@ def main():
     'figaro-learned',
     'figaro-expert',
     'figaro',
+    'figaro-melody',
     'figaro-inst',
     'figaro-chord',
     'figaro-meta',
@@ -109,7 +110,7 @@ def main():
 
   MAX_CONTEXT = min(1024, CONTEXT_SIZE)
 
-  if MODEL in ['figaro-learned', 'figaro'] and VAE_CHECKPOINT:
+  if MODEL in ['figaro-learned', 'figaro', 'figaro-melody'] and VAE_CHECKPOINT:
     # vae_module = VqVaeModule.load_from_checkpoint(checkpoint_path=VAE_CHECKPOINT)
     # vae_module.cpu()
     # vae_module.freeze()
@@ -129,6 +130,7 @@ def main():
       'vq-vae': VqVaeModule,
       'figaro-learned': Seq2SeqModule,
       'figaro-expert': Seq2SeqModule,
+      'figaro-melody': Seq2SeqModule,
       'figaro': Seq2SeqModule,
       'figaro-inst': Seq2SeqModule,
       'figaro-chord': Seq2SeqModule,
@@ -189,6 +191,14 @@ def main():
       ),
       'figaro-expert': lambda: Seq2SeqModule(
         description_flavor='description',
+        **seq2seq_kwargs
+      ),
+      'figaro-melody': lambda: Seq2SeqModule(
+        description_flavor='both',
+        n_codes=vae_module.n_codes,
+        n_groups=vae_module.n_groups,
+        d_latent=vae_module.d_latent,
+        description_options={ 'instruments': True, 'chords': True, 'meta': True, 'separated_melody': True },
         **seq2seq_kwargs
       ),
       'figaro-no-meta': lambda: Seq2SeqModule(

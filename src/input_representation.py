@@ -20,6 +20,8 @@ from constants import (
   MEAN_PITCH_KEY,
   MEAN_VELOCITY_KEY,
   MEAN_DURATION_KEY,
+  MELODY_INSTRUMENT_KEY,
+  MELODY_NOTE_KEY,
   # discretization parameters
   DEFAULT_POS_PER_QUARTER,
   DEFAULT_VELOCITY_BINS,
@@ -62,8 +64,20 @@ class Event(object):
 class InputRepresentation():
   def version():
     return 'v4'
-  
-  def __init__(self, file, do_extract_chords=True, strict=False):
+
+  def __init__(self, file, do_extract_chords=True, strict=False, melody_file=None):
+    # If melody_file is given item type 'Note' represents the residual (non-melody) notes of the song
+    # file and melody_file are obtained from the same song via preprocessing with extract_predominant_melody.py
+    if melody_file is not None:
+      if isinstance(file, pretty_midi.PrettyMIDI):
+        self.pm_mel = file
+      else:
+        self.pm_mel = pretty_midi.PrettyMIDI(file)
+      self.separated_melody = True
+    else:
+      self.separated_melody = False
+      self.pm_mel = None
+
     if isinstance(file, pretty_midi.PrettyMIDI):
       self.pm = file
     else:
@@ -72,13 +86,16 @@ class InputRepresentation():
     if strict and len(self.pm.time_signature_changes) == 0:
       raise ValueError("Invalid MIDI file: No time signature defined")
 
+    if strict and len(self.pm_mel.time_signature_changes) == 0:
+      raise ValueError("Invalid MIDI Melody file: No time signature defined")
+
     self.resolution = self.pm.resolution
 
     self.note_items = None
     self.tempo_items = None
     self.chords = None
     self.groups = None
-    
+
     self._read_items()
     self._quantize_items()
     if do_extract_chords:
@@ -88,11 +105,8 @@ class InputRepresentation():
     if strict and len(self.note_items) == 0:
       raise ValueError("Invalid MIDI file: No notes found, empty file.")
 
-  # read notes and tempo changes from midi (assume there is only one track)
-  def _read_items(self):
-    # note
-    self.note_items = []
-    for instrument in self.pm.instruments:
+  def _process_pm_to_note_items(self, pm_to_read, note_item_identifier='Note'):
+    for instrument in pm_to_read.instruments:
       pedal_events = [event for event in instrument.control_changes if event.number == 64]
       pedal_pressed = False
       start = None
@@ -113,7 +127,7 @@ class InputRepresentation():
         instrument_name = 'drum'
       else:
         instrument_name = instrument.program
-      
+
       pedal_idx = 0
       for note in notes:
         pedal_candidates = [(i + pedal_idx, pedal) for i, pedal in enumerate(pedals[pedal_idx:]) if note.end >= pedal.start and note.start < pedal.end]
@@ -122,15 +136,26 @@ class InputRepresentation():
           pedal = pedal_candidates[-1][1]
         else:
           pedal = Item(name='Pedal', start=0, end=0)
-        
+
         self.note_items.append(Item(
-          name='Note', 
-          start=self.pm.time_to_tick(note.start), 
-          end=self.pm.time_to_tick(max(note.end, pedal.end)), 
-          velocity=note.velocity, 
+          name=note_item_identifier,
+          start=pm_to_read.time_to_tick(note.start),
+          end=pm_to_read.time_to_tick(max(note.end, pedal.end)),
+          velocity=note.velocity,
           pitch=note.pitch,
           instrument=instrument_name))
+
+  # read notes and tempo changes from midi (assume there is only one track)
+  def _read_items(self):
+    # note
+    self.note_items = []
+
+    self._process_pm_to_note_items(pm_to_read=self.pm)
+    if self.separated_melody:
+      self._process_pm_to_note_items(pm_to_read=self.pm_mel, note_item_identifier='Melody')
+
     self.note_items.sort(key=lambda x: (x.start, x.pitch))
+
     # tempo
     self.tempo_items = []
     times, tempi = self.pm.get_tempo_changes()
@@ -182,6 +207,7 @@ class InputRepresentation():
   def get_end_tick(self):
     return self.pm.time_to_tick(self.pm.get_end_time())
 
+  # NOTE: Chord is the same for melody and residual
   # extract chord
   def extract_chords(self):
     end_tick = self.pm.time_to_tick(self.pm.get_end_time())
@@ -222,11 +248,19 @@ class InputRepresentation():
       items = self.tempo_items + self.note_items
 
     def _get_key(item):
-      type_priority = {
-        'Chord': 0,
-        'Tempo': 1,
-        'Note': 2
-      }
+      if self.separated_melody:
+        type_priority = {
+          'Chord': 0,
+          'Tempo': 1,
+          'Melody': 2,
+          'Note': 3
+        }
+      else:
+        type_priority = {
+          'Chord': 0,
+          'Tempo': 1,
+          'Note': 2
+        }
       return (
         item.start, # order by time
         type_priority[item.name], # chord events first, then tempo events, then note events
@@ -251,7 +285,7 @@ class InputRepresentation():
     for idx in [0, -1]:
       while len(self.groups) > 0:
         group = self.groups[idx]
-        notes = [item for item in group[1:-1] if item.name == 'Note']
+        notes = [item for item in group[1:-1] if item.name in ['Note', 'Melody']]
         if len(notes) == 0:
           self.groups.pop(idx)
         else:
@@ -286,7 +320,7 @@ class InputRepresentation():
   def tick_to_position(self, tick):
     return round(tick / self.pm.resolution * DEFAULT_POS_PER_QUARTER)
 
-  def _process_note_items(self, events, item):
+  def _process_note_item_to_events(self, events, item):
     # instrument
     if item.instrument == 'drum':
       name = 'drum'
@@ -384,9 +418,9 @@ class InputRepresentation():
           value='{}'.format(index),
           text='{}/{}'.format(index+1, positions_per_bar))
 
-        if item.name in ['Note', 'Melody', 'Residual']:
+        if item.name in ['Note', 'Melody']:
           events.append(pos_event)
-          self._process_note_items(events, item)
+          self._process_note_item_to_events(events, item)
         elif item.name == 'Chord':
           if current_chord is None or item.pitch != current_chord.pitch:
             events.append(pos_event)
@@ -407,7 +441,7 @@ class InputRepresentation():
               value=index,
               text='{}/{}'.format(tempo, DEFAULT_TEMPO_BINS[index])))
             current_tempo = item
-    
+
     return [f'{e.name}_{e.value}' for e in events]
 
   def get_description(self, 
@@ -442,7 +476,7 @@ class InputRepresentation():
         ))
 
       if not omit_meta:
-        notes = [item for item in self.groups[i][1:-1] if item.name == 'Note']
+        notes = [item for item in self.groups[i][1:-1] if item.name in ['Note', 'Melody']]
         n_notes = len(notes)
         velocities = np.array([item.velocity for item in notes])
         pitches = np.array([item.pitch for item in notes])
@@ -514,7 +548,29 @@ class InputRepresentation():
             value=chord.pitch,
             text='{}'.format(chord.pitch)
           ))
-        
+
+      if self.separated_melody:
+        melody = [item for item in self.groups[i][1:-1] if item.name == 'Melody']
+        mel_instr_events = set([])  # List every instrument name once
+        mel_note_events = []
+        for mel_note in melody:
+          mel_instr_events.add(Event(
+            name=MELODY_INSTRUMENT_KEY,
+            time=None,
+            value=mel_note.instrument,
+            text=mel_note.instrument
+          ))
+          # Melody note value get saved as a single Event with shape pitch;velocity;duration
+          mel_note_value = '{};{};{}'.format(mel_note.pitch, mel_note.velocity, mel_note.end - mel_note.start)
+          mel_note_events.append(Event(
+            name=MELODY_NOTE_KEY,
+            time=None,
+            value=mel_note_value,
+            text=mel_note_value
+          ))
+        # List instruments first, melody notes afterwards
+        events.extend(mel_instr_events)
+        events.extend(mel_note_events)
     return [f'{e.name}_{e.value}' for e in events]
 
 

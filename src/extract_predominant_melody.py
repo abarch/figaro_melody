@@ -86,7 +86,9 @@ def extract_from_midi_to_midi(file_path):
     pm_melody.write(out_path_mel)
     print('Melody result written to', out_path_mel)
 
-    out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid'
+    out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual.mid'
+    # Debugging
+    # out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid'
     pm_residual.write(out_path_res)
     print('Residual result written to', out_path_res)
 
