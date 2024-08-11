@@ -355,7 +355,7 @@ class VqVaeModule(pl.LightningModule):
         log_metrics = { key: metrics[key].detach() for key in ['loss', 'rec_loss', 'diff', 'avg_usage', 'usage', 'entropy'] if key in metrics }
         self.log('train', log_metrics, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
         return metrics['loss']
-    
+
     def validation_step(self, batch, batch_idx):
         metrics = self.get_loss(batch)
         log_metrics = { key: metrics[key].detach() for key in ['rec_loss', 'diff', 'avg_usage', 'usage', 'entropy'] if key in metrics }

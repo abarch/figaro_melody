@@ -212,6 +212,8 @@ def main():
       ),
     }[MODEL]()
 
+  model.requires_grad_(requires_grad=True)
+
   datamodule = model.get_datamodule(
     midi_files,
     vae_module=vae_module,
@@ -244,7 +246,7 @@ def main():
     val_check_interval=max(500, min(300*ACCUMULATE_GRADS, 1000)),
     limit_val_batches=64,
     accumulate_grad_batches=ACCUMULATE_GRADS,
-    gradient_clip_val=1.0, 
+    gradient_clip_val=1.0,
   )
 
   trainer.fit(model, datamodule)
