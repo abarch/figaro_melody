@@ -28,33 +28,20 @@ def extract_from_midi_to_midi(file_path):
     pm_melody = pretty_midi.PrettyMIDI()
     instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
     for pitch, onset, duration in zip(notes, onsets, durations):
-        # NOTE velocity = 100 is a default value that is negligible for this scenario
-        # TODO use velocity from input if input is midi -> add input representation as parameter!
-        # Velocity ist in note_items gespeichert
-        note = pretty_midi.Note(velocity=100, pitch=int(pitch), start=onset, end=onset + duration)
+        # NOTE velocity = -1 is a default value and is changed later. Otherwise -1 is an invalid velocity value
+        note = pretty_midi.Note(velocity=-1, pitch=int(pitch), start=onset, end=onset + duration)
         instrument.notes.append(note)
     pm_melody.instruments.append(instrument)
 
     # Compute residual
 
-
-    # Copy original pm
-    # pm_residual = pretty_midi.PrettyMIDI()
-    # pm_residual.instruments.extend(pm_original.instruments)
-    # pm_residual.time_signature_changes.extend(pm_original.time_signature_changes)
-    # pm_residual.resolution = pm_original.resolution
-    # pm_residual.key_signature_changes.extend(pm_original.key_signature_changes)
-
     melody_notes = pm_melody.instruments[0].notes  # melody only contains 1 instrument
     pm_residual = deepcopy(pm_original)
 
-    # print('len(melody_notes)', len(melody_notes))
-    # print('len(residual_notes)', len(residual_notes))
-
     # TODO MAIN Tweak the thresholds
-    time_thresh_start = 1  # 100
+    time_thresh_start = 1
     time_thresh_end = 1
-    pitch_thresh = 4  # 10
+    pitch_thresh = 4
 
     processed_orig_notes = 0
     removed_notes = 0
@@ -78,7 +65,15 @@ def extract_from_midi_to_midi(file_path):
                     if _filter_condition(melody_note=m_note, orig_note=o_note):
                         notes_to_keep.add(o_note_idx)
                         found_mel_note_idx = o_note_idx
+                        # Set velocity of melody note according to the matching non-melody note
+                        m_note.velocity = o_note.velocity
                         break
+                # If velocity is still at the default value, take the value of the previous m_note
+                if m_note.velocity == -1:
+                    if m_note_idx == 0:  # If the current melody note is the first and did not match any o_note:
+                        m_note.velocity = instr.notes[0].velocity  # take the first o_note's velocity
+                    else:
+                        m_note.velocity = melody_notes[m_note_idx - 1].velocity
             instr.notes = list(np.array(instr.notes)[list(notes_to_keep)])
             # NOTE Just for debugging
             removed_notes += (note_len_before - len(instr.notes))
