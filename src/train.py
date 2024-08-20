@@ -115,7 +115,7 @@ def main():
     # vae_module.cpu()
     # vae_module.freeze()
     # vae_module.eval()
-    vae_module = load_old_or_new_checkpoint(VqVaeModule, CHECKPOINT)
+    vae_module = load_old_or_new_checkpoint(VqVaeModule, VAE_CHECKPOINT)
 
   else:
     vae_module = None
