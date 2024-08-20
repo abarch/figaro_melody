@@ -223,7 +223,8 @@ class MidiDataset(IterableDataset):
       self.vae_module.freeze()
     self.description_options = description_options
 
-    self.desc_vocab = DescriptionVocab()
+    self.separated_melody_present = self.description_options['separated_melody']
+    self.desc_vocab = DescriptionVocab(add_melody_tokens=self.separated_melody_present)
 
     self.bar_token_mask = bar_token_mask
     self.bar_token_idx = bar_token_idx
@@ -438,7 +439,7 @@ class MidiDataset(IterableDataset):
     except Exception:
       # If there's no cached version, compute the representations
       try:
-        if self.description_options['separated_melody']:  # Needs to hold for every file if True!
+        if self.separated_melody_present:  # Needs to hold for every file if True!
           # if the predominant melody is separated, load the appropriate file as well
           melody_file = None
           # if file ends with _residual, add its melody as second file

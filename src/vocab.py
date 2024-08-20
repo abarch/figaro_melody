@@ -151,7 +151,7 @@ class RemiVocab(Vocab):
 
 
 class DescriptionVocab(Vocab):
-  def __init__(self):
+  def __init__(self, add_melody_tokens=False):
     time_sig_tokens = Tokens.get_time_signature_tokens()
     instrument_tokens = Tokens.get_instrument_tokens()
     chord_tokens = Tokens.get_chord_tokens()
@@ -162,19 +162,21 @@ class DescriptionVocab(Vocab):
     pitch_tokens = [f'{MEAN_PITCH_KEY}_{i}' for i in range(len(DEFAULT_MEAN_PITCH_BINS))]
     duration_tokens = [f'{MEAN_DURATION_KEY}_{i}' for i in range(len(DEFAULT_MEAN_DURATION_BINS))]
 
-    melody_tokens = Tokens.get_melody_tokens()
-
     self.tokens = (
       time_sig_tokens +
-      instrument_tokens + 
-      chord_tokens + 
-      density_tokens + 
-      velocity_tokens + 
-      pitch_tokens + 
-      duration_tokens + 
-      bar_tokens +
-      melody_tokens
+      instrument_tokens +
+      chord_tokens +
+      density_tokens +
+      velocity_tokens +
+      pitch_tokens +
+      duration_tokens +
+      bar_tokens
     )
+
+    # Conditionally add melody tokens
+    if add_melody_tokens:
+      melody_tokens = Tokens.get_melody_tokens()
+      self.tokens += melody_tokens
 
     counter = Counter(self.tokens)
     super().__init__(counter)
