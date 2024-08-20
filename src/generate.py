@@ -167,7 +167,7 @@ def main():
 
 
   description_options = None
-  if args.model in ['figaro-no-inst', 'figaro-no-chord', 'figaro-no-meta']:
+  if args.model in ['figaro-no-inst', 'figaro-no-chord', 'figaro-no-meta', 'figaro-melody']:
     description_options = model.description_options
 
   dataset = MidiDataset(

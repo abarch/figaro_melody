@@ -203,17 +203,17 @@ def main():
       ),
       'figaro-no-meta': lambda: Seq2SeqModule(
         description_flavor='description',
-        description_options={ 'instruments': True, 'chords': True, 'meta': False },
+        description_options={ 'instruments': True, 'chords': True, 'meta': False, 'separated_melody': False },
         **seq2seq_kwargs
       ),
       'figaro-no-inst': lambda: Seq2SeqModule(
         description_flavor='description',
-        description_options={ 'instruments': False, 'chords': True, 'meta': True },
+        description_options={ 'instruments': False, 'chords': True, 'meta': True, 'separated_melody': False },
         **seq2seq_kwargs
       ),
       'figaro-no-chord': lambda: Seq2SeqModule(
         description_flavor='description',
-        description_options={ 'instruments': True, 'chords': False, 'meta': True },
+        description_options={ 'instruments': True, 'chords': False, 'meta': True, 'separated_melody': False },
         **seq2seq_kwargs
       ),
       'baseline': lambda: Seq2SeqModule(

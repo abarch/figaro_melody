@@ -244,7 +244,11 @@ class MidiDataset(IterableDataset):
 
 
   def __iter__(self):
-    worker_info = torch.utils.data.get_worker_info()
+    # TODO NOTE Disabled workers for now
+    # because _melody.mid files need to stay together with their respective _residual.mid file for melody processing
+    # -> This results in self.split = [[self.files]]
+    # worker_info = torch.utils.data.get_worker_info()
+    worker_info = None
     self.split = _get_split(self.files, worker_info)
 
     split_len = len(self.split)
@@ -474,14 +478,14 @@ class MidiDataset(IterableDataset):
 
     if self.description_options is not None and len(self.description_options) > 0:
       opts = self.description_options
-      kwargs = { key: opts[key] for key in ['instruments', 'chords', 'meta'] if key in opts }
+      kwargs = { key: opts[key] for key in ['instruments', 'chords', 'meta', 'separated_melody'] if key in opts }
       sample['description'] = self.preprocess_description(sample['description'], **self.description_options)
     return sample
 
   def get_latent_representation(self, events, cache_key=None, bar_token_mask='<mask>'):
     if cache_key and self.use_cache:
       cache_file = os.path.join(self.latent_cache_path, cache_key)
-    
+
     try:
       latents, codes = pickle.load(open(cache_file, 'rb'))
     except Exception:

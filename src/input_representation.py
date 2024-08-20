@@ -44,7 +44,7 @@ class Item(object):
     self.pitch = pitch
     self.instrument = instrument
 
-  # NOTE Item name in [Note, Chord, Pedal, Tempo, Melody, Residual]
+  # NOTE Item name in [Note, Chord, Pedal, Tempo, Melody]
   def __repr__(self):
     return 'Item(name={}, start={}, end={}, velocity={}, pitch={}, instrument={})'.format(
       self.name, self.start, self.end, self.velocity, self.pitch, self.instrument)
@@ -621,7 +621,7 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
     'time_sig': current_time_sig,
     'tempo': bpm
   }
-  
+
   bar = -1
   n_notes = 0
   polyphony_control = {}
@@ -631,7 +631,7 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
 
     if not bar in polyphony_control:
       polyphony_control[bar] = {}
-    
+
     if f"{BAR_KEY}_" in events[i]:
       # Next bar is starting
       bar += 1
@@ -668,11 +668,12 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
         f"{PITCH_KEY}_" in events[i+2] and \
         f"{VELOCITY_KEY}_" in events[i+3] and \
         f"{DURATION_KEY}_" in events[i+4]:
+
       # get position
       position = int(events[i].split('_')[-1])
       if not position in polyphony_control[bar]:
         polyphony_control[bar][position] = {}
-      
+
       # get instrument
       instrument_name = events[i+1].split('_')[-1]
       if instrument_name not in polyphony_control[bar][position]:
@@ -709,7 +710,7 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
       instrument.notes.append(note)
       n_notes += 1
       polyphony_control[bar][position][instrument_name] += 1
-    
+
   for instrument in instruments.values():
     pm.instruments.append(instrument)
   return pm

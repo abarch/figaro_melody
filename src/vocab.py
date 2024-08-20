@@ -39,9 +39,9 @@ from constants import (
   MEAN_PITCH_KEY,
   MEAN_VELOCITY_KEY,
   MEAN_DURATION_KEY,
+  MELODY_NOTE_KEY,
+  MELODY_INSTRUMENT_KEY
 )
-
-
 
 class Tokens:
   def get_instrument_tokens(key=INSTRUMENT_KEY):
@@ -95,6 +95,17 @@ class Tokens:
       bar_tokens + 
       position_tokens
     )
+
+  def get_melody_tokens(melody_note_key=MELODY_NOTE_KEY, melody_instrument_key=MELODY_INSTRUMENT_KEY):
+    # Shape: Melody Instrument_(instrument)
+    instrument_tokens = Tokens.get_instrument_tokens(key=melody_instrument_key)
+
+    # Shape: Melody Note_(pitch);(velocity);(duration)
+    pitch_values = list(range(128))
+    velocity_values = list(range(len(DEFAULT_VELOCITY_BINS)))
+    duration_values = list(range(len(DEFAULT_DURATION_BINS)))
+    note_tokens = [f'{melody_note_key}_{p};{v};{d}' for p in pitch_values for v in velocity_values for d in duration_values]
+    return instrument_tokens + note_tokens
 
 class Vocab:
   def __init__(self, counter, specials=[PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN, MASK_TOKEN], unk_token=UNK_TOKEN):
@@ -151,6 +162,8 @@ class DescriptionVocab(Vocab):
     pitch_tokens = [f'{MEAN_PITCH_KEY}_{i}' for i in range(len(DEFAULT_MEAN_PITCH_BINS))]
     duration_tokens = [f'{MEAN_DURATION_KEY}_{i}' for i in range(len(DEFAULT_MEAN_DURATION_BINS))]
 
+    melody_tokens = Tokens.get_melody_tokens()
+
     self.tokens = (
       time_sig_tokens +
       instrument_tokens + 
@@ -159,7 +172,8 @@ class DescriptionVocab(Vocab):
       velocity_tokens + 
       pitch_tokens + 
       duration_tokens + 
-      bar_tokens
+      bar_tokens +
+      melody_tokens
     )
 
     counter = Counter(self.tokens)
