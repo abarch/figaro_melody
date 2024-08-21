@@ -34,7 +34,6 @@ def extract_from_midi_to_midi(file_path):
     pm_melody.instruments.append(instrument)
 
     # Compute residual
-
     melody_notes = deepcopy(pm_melody.instruments[0].notes)  # melody only contains 1 instrument
     pm_melody.instruments.clear()  # Will be recalculated below
 
@@ -102,9 +101,9 @@ def extract_from_midi_to_midi(file_path):
                     else:
                         m_note.velocity = melody_notes[m_note_idx - 1].velocity
 
-                # Add the melody notes with the fitting instrument again
-                if len(new_mel_instrument.notes) > 0:
-                    pm_melody.instruments.append(new_mel_instrument)
+            # Add the melody notes with the fitting instrument again
+            if len(new_mel_instrument.notes) > 0:
+                pm_melody.instruments.append(new_mel_instrument)
 
             instr.notes = np.delete(np.array(instr.notes), o_notes_to_delete)
 
@@ -157,7 +156,7 @@ def export_to_midi(audio_data, file_path, pitch_values):
     instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
     pm_melody = pretty_midi.PrettyMIDI()
     for pitch, onset, duration in zip(notes, onsets, durations):
-        # NOTE velocity = 100 is a default value that is negligible for this scenario
+        # Old! Has to be adjusted as in extract_from_midi_to_midi
         note = pretty_midi.Note(velocity=100, pitch=int(pitch), start=onset, end=onset + duration)
         instrument.notes.append(note)
     pm_melody.instruments.append(instrument)
