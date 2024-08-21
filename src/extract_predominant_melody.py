@@ -35,10 +35,11 @@ def extract_from_midi_to_midi(file_path):
 
     # Compute residual
 
-    melody_notes = pm_melody.instruments[0].notes  # melody only contains 1 instrument
+    melody_notes = deepcopy(pm_melody.instruments[0].notes)  # melody only contains 1 instrument
+    pm_melody.instruments.clear()  # Will be recalculated below
+
     pm_residual = deepcopy(pm_original)
 
-    # TODO MAIN Tweak the thresholds
     time_thresh_start = 1
     time_thresh_end = 1
     pitch_thresh = 4
@@ -46,38 +47,71 @@ def extract_from_midi_to_midi(file_path):
     processed_orig_notes = 0
     removed_notes = 0
 
-    # Condition for keeping the elements
+    # Elements to be deleted from o_notes
     def _filter_condition(melody_note, orig_note):
-        return abs(melody_note.pitch - orig_note.pitch) >= pitch_thresh and \
-                abs(melody_note.start-orig_note.start) > time_thresh_start and \
-                abs(melody_note.end-orig_note.end) > time_thresh_end
+        return abs(melody_note.pitch - orig_note.pitch) <= pitch_thresh and \
+                abs(melody_note.start - orig_note.start) <= time_thresh_start and \
+                abs(melody_note.end - orig_note.end) <= time_thresh_end
 
     for instr in pm_residual.instruments:
         if not instr.is_drum:
-            note_len_before = len(instr.notes)
-            processed_orig_notes += note_len_before
-            notes_to_keep = set()
+            # Debugging
+            processed_orig_notes += len(instr.notes)
+            # --------------------------------------
+
+            o_notes_to_delete = []
+            new_mel_instrument = pretty_midi.Instrument(name=instr.name, program=instr.program)
+
             # Remember the index of the position the melody note was found in the original song
             # to reduce number of iterations
             found_mel_note_idx = 0
             for m_note_idx, m_note in enumerate(melody_notes):
+                mel_instrument_set = False
+                mel_note_block_found = False
+                # o_note is the original note of the instrument
                 for o_note_idx, o_note in enumerate(instr.notes[found_mel_note_idx:], start=found_mel_note_idx):
+                    # m_note and o_note are close
                     if _filter_condition(melody_note=m_note, orig_note=o_note):
-                        notes_to_keep.add(o_note_idx)
-                        found_mel_note_idx = o_note_idx
-                        # Set velocity of melody note according to the matching non-melody note
-                        m_note.velocity = o_note.velocity
-                        break
+                        # Collect indices of o_notes that are found in the melody notes
+                        o_notes_to_delete.append(o_note_idx)
+
+                        # Only set each melody instrument once for each m_note
+                        if not mel_instrument_set:
+                            # Remember the current o_note_idx to reduce iterations for next m_note
+                            # because we know that the m_notes cannot occur simultaneously.
+                            found_mel_note_idx = o_note_idx
+                            # Remember whether a note already matched for processing the following o_notes
+                            mel_note_block_found = True
+                            # Set velocity of melody note according to the matching non-melody note
+                            m_note.velocity = o_note.velocity
+                            # Add melody note to fitting instrument
+                            new_mel_instrument.notes.append(m_note)
+                            mel_instrument_set = True
+                    # m_note is parted from o_note according to the thresholds
+                    else:
+                        # if a note already matched and it does not any more,
+                        # every o_notes for this m_note have been found
+                        # -> Continue with next m_note
+                        if mel_note_block_found:
+                            break
+
                 # If velocity is still at the default value, take the value of the previous m_note
                 if m_note.velocity == -1:
                     if m_note_idx == 0:  # If the current melody note is the first and did not match any o_note:
                         m_note.velocity = instr.notes[0].velocity  # take the first o_note's velocity
                     else:
                         m_note.velocity = melody_notes[m_note_idx - 1].velocity
-            instr.notes = list(np.array(instr.notes)[list(notes_to_keep)])
-            # NOTE Just for debugging
-            removed_notes += (note_len_before - len(instr.notes))
 
+                # Add the melody notes with the fitting instrument again
+                if len(new_mel_instrument.notes) > 0:
+                    pm_melody.instruments.append(new_mel_instrument)
+
+            instr.notes = np.delete(np.array(instr.notes), o_notes_to_delete)
+
+            # Debug
+            removed_notes += len(o_notes_to_delete)
+
+    # Debug output
     print('Processed notes', processed_orig_notes)
     print('Removed notes', removed_notes)
 
