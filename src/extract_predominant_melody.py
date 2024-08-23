@@ -25,19 +25,17 @@ def extract_from_midi_to_midi(file_path):
     # Pitch values to pm
     onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
 
-    pm_melody = pretty_midi.PrettyMIDI()
-    instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
+    pm_melody = deepcopy(pm_original)
+    melody_notes = []
     for pitch, onset, duration in zip(notes, onsets, durations):
         # NOTE velocity = -1 is a default value and is changed later. Otherwise -1 is an invalid velocity value
         note = pretty_midi.Note(velocity=-1, pitch=int(pitch), start=onset, end=onset + duration)
-        instrument.notes.append(note)
-    pm_melody.instruments.append(instrument)
+        melody_notes.append(note)
 
     # Compute residual
-    melody_notes = deepcopy(pm_melody.instruments[0].notes)  # melody only contains 1 instrument
     pm_melody.instruments.clear()  # Will be recalculated below
 
-    pm_residual = deepcopy(pm_original)
+    # pm_residual = deepcopy(pm_original)
 
     time_thresh_start = 1
     time_thresh_end = 1
@@ -46,20 +44,23 @@ def extract_from_midi_to_midi(file_path):
     processed_orig_notes = 0
     removed_notes = 0
 
-    # Elements to be deleted from o_notes
+    # Elements to be deleted from o_notes (= melody notes in original notes)
     def _filter_condition(melody_note, orig_note):
         return abs(melody_note.pitch - orig_note.pitch) <= pitch_thresh and \
                 abs(melody_note.start - orig_note.start) <= time_thresh_start and \
                 abs(melody_note.end - orig_note.end) <= time_thresh_end
 
-    for instr in pm_residual.instruments:
+    for instr in pm_original.instruments:
         if not instr.is_drum:
             # Debugging
             processed_orig_notes += len(instr.notes)
             # --------------------------------------
 
             o_notes_to_delete = []
+
             new_mel_instrument = pretty_midi.Instrument(name=instr.name, program=instr.program)
+            new_mel_instrument.control_changes = instr.control_changes
+            new_mel_instrument.pitch_bends = instr.pitch_bends
 
             # Remember the index of the position the melody note was found in the original song
             # to reduce number of iterations
@@ -122,7 +123,7 @@ def extract_from_midi_to_midi(file_path):
     out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual.mid'
     # Debugging
     # out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid'
-    pm_residual.write(out_path_res)
+    pm_original.write(out_path_res)
     print('Residual result written to', out_path_res)
 
 def extract_from_mp3_to_midi(file_path):
