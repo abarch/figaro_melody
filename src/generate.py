@@ -188,7 +188,7 @@ def main():
       n_bars=args.n_medley_bars, 
       description_flavor=model.description_flavor
     )
-  
+
   with torch.no_grad():
     for batch in dl:
       reconstruct_sample(model, batch, 

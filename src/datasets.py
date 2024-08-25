@@ -246,7 +246,7 @@ class MidiDataset(IterableDataset):
 
   def __iter__(self):
     # TODO NOTE Disabled workers for now
-    # because _melody.mid files need to stay together with their respective _residual.mid file for melody processing
+    # because _melody.mid files need to stay together with their respective _accompaniment.mid file for melody processing
     # -> This results in self.split = [[self.files]]
     # worker_info = torch.utils.data.get_worker_info()
     worker_info = None
@@ -442,9 +442,9 @@ class MidiDataset(IterableDataset):
         if self.separated_melody_present:  # Needs to hold for every file if True!
           # if the predominant melody is separated, load the appropriate file as well
           melody_file = None
-          # if file ends with _residual, add its melody as second file
-          if name.endswith('_residual.mid'):
-            melody_file = name.replace(__old='_residual.mid', __new='_melody.mid')
+          # if file ends with _accompaniment, add its melody as second file
+          if name.endswith('_accompaniment.mid'):
+            melody_file = name.replace(__old='_accompaniment.mid', __new='_melody.mid')
           # if file ends with _melody, skip it as it is already processed above
           elif name.endswith('_melody.mid'):
             pass

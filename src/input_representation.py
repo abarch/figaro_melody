@@ -66,7 +66,7 @@ class InputRepresentation():
     return 'v4'
 
   def __init__(self, file, do_extract_chords=True, strict=False, melody_file=None):
-    # If melody_file is given item type 'Note' represents the residual (non-melody) notes of the song
+    # If melody_file is given item type 'Note' represents the accompaniment (non-melody) notes of the song
     # file and melody_file are obtained from the same song via preprocessing with extract_predominant_melody.py
     if melody_file is not None:
       if isinstance(file, pretty_midi.PrettyMIDI):
@@ -207,7 +207,7 @@ class InputRepresentation():
   def get_end_tick(self):
     return self.pm.time_to_tick(self.pm.get_end_time())
 
-  # NOTE: Chord is the same for melody and residual
+  # NOTE: Chord is the same for melody and accompaniment
   # extract chord
   def extract_chords(self):
     end_tick = self.pm.time_to_tick(self.pm.get_end_time())

@@ -32,10 +32,10 @@ def extract_from_midi_to_midi(file_path):
         note = pretty_midi.Note(velocity=-1, pitch=int(pitch), start=onset, end=onset + duration)
         melody_notes.append(note)
 
-    # Compute residual
+    # Compute accompaniment
     pm_melody.instruments.clear()  # Will be recalculated below
 
-    # pm_residual = deepcopy(pm_original)
+    # pm_accomp = deepcopy(pm_original)
 
     time_thresh_start = 1
     time_thresh_end = 1
@@ -120,11 +120,11 @@ def extract_from_midi_to_midi(file_path):
     pm_melody.write(out_path_mel)
     print('Melody result written to', out_path_mel)
 
-    out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual.mid'
+    out_path_accomp = f'{OUT_ROOT}/{Path(file_path).stem}_accompaniment.mid'
     # Debugging
-    # out_path_res = f'{OUT_ROOT}/{Path(file_path).stem}_residual_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid'
-    pm_original.write(out_path_res)
-    print('Residual result written to', out_path_res)
+    # out_path_accomp = f'{OUT_ROOT}/{Path(file_path).stem}_accompaniment_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid'
+    pm_original.write(out_path_accomp)
+    print('Accompaniment result written to', out_path_accomp)
 
 def extract_from_mp3_to_midi(file_path):
     print('Processing', file_path)
