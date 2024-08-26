@@ -99,7 +99,11 @@ def main():
 
 
   ### Create data loaders ###
-  midi_files = glob.glob(os.path.join(ROOT_DIR, '**/*.mid'), recursive=True)
+  if MODEL == 'figaro-melody':
+    # Only use accompaniment files. Otherwise each pair of melody and accompaniment will be used twice
+    midi_files = glob.glob(os.path.join(ROOT_DIR, '**/*_accompaniment.mid'), recursive=True)
+  else:
+    midi_files = glob.glob(os.path.join(ROOT_DIR, '**/*.mid'), recursive=True)
   if MAX_N_FILES > 0:
     midi_files = midi_files[:MAX_N_FILES]
 

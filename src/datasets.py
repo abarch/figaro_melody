@@ -184,7 +184,7 @@ class SeqCollator:
 
     if 'file' in features[0]:
       batch['files'] = [feature['file'] for feature in features]
-    
+
     return batch
 
 class MidiDataset(IterableDataset):
@@ -223,7 +223,7 @@ class MidiDataset(IterableDataset):
       self.vae_module.freeze()
     self.description_options = description_options
 
-    self.separated_melody_present = self.description_options['separated_melody']
+    self.separated_melody_present = False if description_options is None else description_options['separated_melody']
     self.desc_vocab = DescriptionVocab(add_melody_tokens=self.separated_melody_present)
 
     self.bar_token_mask = bar_token_mask
@@ -443,13 +443,14 @@ class MidiDataset(IterableDataset):
           # if the predominant melody is separated, load the appropriate file as well
           melody_file = None
           # if file ends with _accompaniment, add its melody as second file
-          if name.endswith('_accompaniment.mid'):
-            melody_file = name.replace(__old='_accompaniment.mid', __new='_melody.mid')
-          # if file ends with _melody, skip it as it is already processed above
-          elif name.endswith('_melody.mid'):
-            pass
-          # else:
-          #   print('Unkown file found!', name)
+          if file.endswith('_accompaniment.mid'):
+            melody_file = file.replace(__old='_accompaniment.mid', __new='_melody.mid')
+          # if file ends with _melody, use it as "melody_file" and fetch accompaniment file as "file"
+          elif file.endswith('_melody.mid'):
+            melody_file = file
+            file = file.replace(__old='_melody.mid', __new='_accompaniment.mid')
+          else:
+            print('ERROR: Unkown file found! File name has to end with _melody.mid or _accompaniment.mid when model is figaro-melody', name)
           rep = InputRepresentation(file, strict=True, melody_file=melody_file)
         else:
           rep = InputRepresentation(file, strict=True)

@@ -154,9 +154,12 @@ def main():
 
   model, vae_module = load_model(args.checkpoint, args.vae_checkpoint)
 
+  if args.model == 'figaro-melody':
+    # Only use accompaniment files. Otherwise each tuple will be used twice
+    midi_files = glob.glob(os.path.join(args.lmd_dir, '**/*_accompaniment.mid'), recursive=True)
+  else:
+    midi_files = glob.glob(os.path.join(args.lmd_dir, '**/*.mid'), recursive=True)
 
-  midi_files = glob.glob(os.path.join(args.lmd_dir, '**/*.mid'), recursive=True)
-  
   dm = model.get_datamodule(midi_files, vae_module=vae_module)
   dm.setup('test')
   midi_files = dm.test_ds.files
@@ -191,7 +194,7 @@ def main():
 
   with torch.no_grad():
     for batch in dl:
-      reconstruct_sample(model, batch, 
+      reconstruct_sample(model, batch,
         output_dir=output_dir, 
         max_iter=args.max_iter, 
         max_bars=max_bars,
