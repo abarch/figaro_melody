@@ -444,11 +444,11 @@ class MidiDataset(IterableDataset):
           melody_file = None
           # if file ends with _accompaniment, add its melody as second file
           if file.endswith('_accompaniment.mid'):
-            melody_file = file.replace(__old='_accompaniment.mid', __new='_melody.mid')
+            melody_file = file.replace('_accompaniment.mid', '_melody.mid')
           # if file ends with _melody, use it as "melody_file" and fetch accompaniment file as "file"
           elif file.endswith('_melody.mid'):
             melody_file = file
-            file = file.replace(__old='_melody.mid', __new='_accompaniment.mid')
+            file = file.replace('_melody.mid', '_accompaniment.mid')
           else:
             print('ERROR: Unkown file found! File name has to end with _melody.mid or _accompaniment.mid when model is figaro-melody', name)
           rep = InputRepresentation(file, strict=True, melody_file=melody_file)
