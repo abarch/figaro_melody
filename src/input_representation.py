@@ -61,6 +61,18 @@ class Event(object):
     return 'Event(name={}, time={}, value={}, text={})'.format(
       self.name, self.time, self.value, self.text)
 
+  def __eq__(self, other):
+    if not isinstance(other, Event):
+      return False
+    return (self.name == other.name and
+            self.time == other.time and
+            self.value == other.value and
+            self.text == other.text)
+
+  def __hash__(self):
+    return hash((self.name, self.time, self.value, self.text))
+
+
 class InputRepresentation():
   def version():
     return 'v4'
@@ -700,7 +712,7 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
       # get duration
       duration_index = int(events[i+4].split('_')[-1])
       duration = DEFAULT_DURATION_BINS[duration_index]
-      # create not and add to instrument
+      # create note and add to instrument
       start = _get_time(last_tl_event, bar, position)
       end = _get_time(last_tl_event, bar, position + duration)
       note = pretty_midi.Note(velocity=velocity,

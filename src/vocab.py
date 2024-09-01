@@ -44,9 +44,10 @@ from constants import (
 )
 
 class Tokens:
-  def get_instrument_tokens(key=INSTRUMENT_KEY):
+  def get_instrument_tokens(key=INSTRUMENT_KEY, with_drum=True):
     tokens = [f'{key}_{pretty_midi.program_to_instrument_name(i)}' for i in range(128)]
-    tokens.append(f'{key}_drum')
+    if with_drum:
+      tokens.append(f'{key}_drum')
     return tokens
 
   def get_chord_tokens(key=CHORD_KEY, qualities = ['maj', 'min', 'dim', 'aug', 'dom7', 'maj7', 'min7', 'None']):
@@ -98,7 +99,7 @@ class Tokens:
 
   def get_melody_tokens(melody_note_key=MELODY_NOTE_KEY, melody_instrument_key=MELODY_INSTRUMENT_KEY):
     # Shape: Melody Instrument_(instrument)
-    instrument_tokens = Tokens.get_instrument_tokens(key=melody_instrument_key)
+    instrument_tokens = Tokens.get_instrument_tokens(key=melody_instrument_key, with_drum=False)
 
     # Shape: Melody Note_(pitch);(velocity);(duration)
     pitch_values = list(range(128))
