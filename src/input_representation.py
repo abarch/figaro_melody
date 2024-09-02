@@ -82,9 +82,9 @@ class InputRepresentation():
     # file and melody_file are obtained from the same song via preprocessing with extract_predominant_melody.py
     if melody_file is not None:
       if isinstance(file, pretty_midi.PrettyMIDI):
-        self.pm_mel = file
+        self.pm_mel = melody_file
       else:
-        self.pm_mel = pretty_midi.PrettyMIDI(file)
+        self.pm_mel = pretty_midi.PrettyMIDI(melody_file)
       self.separated_melody = True
     else:
       self.separated_melody = False
