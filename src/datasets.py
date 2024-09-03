@@ -269,7 +269,7 @@ class MidiDataset(IterableDataset):
       bars, bar_ids = self.get_bars(events, include_ids=True)
       if len(bars) > self.max_bars:
         if self.print_errors:
-          print(f"WARNING: REMI sequence has more than {self.max_bars} bars: {len(bars)} event bars.")
+          print(f"WARNING: REMI sequence in file {self.split[i]} has more than {self.max_bars} bars: {len(bars)} event bars.")
         continue
 
       # Identify positions

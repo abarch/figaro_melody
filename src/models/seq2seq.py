@@ -55,6 +55,7 @@ class Seq2SeqModule(pl.LightningModule):
     self.description_flavor = description_flavor
     assert self.description_flavor in ['latent', 'description', 'none', 'both'], f"Unknown description flavor '{self.description_flavor}', expected one of ['latent', 'description', 'none', 'both]"
     self.description_options = description_options
+    self.separated_melody_present = False if description_options is None else description_options['separated_melody']
 
     self.context_size = context_size
     self.d_model = d_model
@@ -104,7 +105,7 @@ class Seq2SeqModule(pl.LightningModule):
       else:
         self.latent_in = GroupEmbedding(n_codes, n_groups, self.d_model, inner_dim=self.d_latent//n_groups)
     if self.description_flavor in ['description', 'both']:
-      desc_vocab = DescriptionVocab()
+      desc_vocab = DescriptionVocab(add_melody_tokens=self.separated_melody_present)
       self.desc_in = nn.Embedding(len(desc_vocab), self.d_model)
     
     if self.description_flavor == 'both':
@@ -114,7 +115,7 @@ class Seq2SeqModule(pl.LightningModule):
     self.out_layer = nn.Linear(self.d_model, len(self.vocab), bias=False)
     
     self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.vocab.to_i(PAD_TOKEN))
-        
+
     self.save_hyperparameters()
 
   def get_datamodule(self, midi_files, **kwargs):
