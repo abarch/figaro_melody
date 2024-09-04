@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os
 from pathlib import Path
@@ -9,9 +10,9 @@ import pretty_midi
 from copy import deepcopy
 
 SAMPLE_RATE = 44100.0
-OUT_ROOT = 'extraction_examples/essentia_melodia'
 
-def extract_from_midi_to_midi(file_path):
+
+def extract_from_midi_to_midi(file_path, output):
     pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
 
     # synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
@@ -116,17 +117,17 @@ def extract_from_midi_to_midi(file_path):
     print('Removed notes', removed_notes)
 
     # Save to midi file
-    out_path_mel = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
+    out_path_mel = os.path.join(output, f'{Path(file_path).stem}_melody.mid')
     pm_melody.write(out_path_mel)
     print('Melody result written to', out_path_mel)
 
-    out_path_accomp = f'{OUT_ROOT}/{Path(file_path).stem}_accompaniment.mid'
+    out_path_accomp = os.path.join(output, f'{Path(file_path).stem}_accompaniment.mid')
     # Debugging
-    # out_path_accomp = f'{OUT_ROOT}/{Path(file_path).stem}_accompaniment_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid'
+    # out_path_accomp = os.path.join(output, f'{Path(file_path).stem}_accompaniment_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid')
     pm_original.write(out_path_accomp)
     print('Accompaniment result written to', out_path_accomp)
 
-def extract_from_mp3_to_midi(file_path):
+def extract_from_mp3_to_midi(file_path, output):
     print('Processing', file_path)
 
     # Load audio file
@@ -139,7 +140,7 @@ def extract_from_mp3_to_midi(file_path):
     melody_extractor = es.PredominantPitchMelodia(guessUnvoiced=True)
     pitch_values, pitch_confidence = melody_extractor(audio_data)
 
-    export_to_midi(audio_data, file_path, pitch_values)
+    export_to_midi(audio_data, file_path, pitch_values, output)
 
     # ######################################################################
     # ##### Export as raw audio
@@ -149,7 +150,7 @@ def extract_from_mp3_to_midi(file_path):
     # es.AudioWriter(filename='extraction_examples/essentia_melodia/' + base_name + '.mp3', format='mp3')(es.StereoMuxer()(audio, synthesized_melody))
     # ######################################################################
 
-def export_to_midi(audio_data, file_path, pitch_values):
+def export_to_midi(audio_data, file_path, pitch_values, output):
     onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
     # print("MIDI notes:", notes) # Midi pitch number
     # print("MIDI note onsets:", onsets)
@@ -162,19 +163,24 @@ def export_to_midi(audio_data, file_path, pitch_values):
         instrument.notes.append(note)
     pm_melody.instruments.append(instrument)
 
-    out_path = f'{OUT_ROOT}/{Path(file_path).stem}_melody.mid'
+    out_path = os.path.join(output, f'{Path(file_path).stem}_melody.mid')
     pm_melody.write(out_path)
     print('Result written to', out_path)
 
-def process_folder(folder):
+def process_folder(folder, output):
     # input_files = glob.glob(os.path.join(folder, '**/*.mp3'), recursive=True)
     input_files = glob.glob(os.path.join(folder, '**/*.mid'), recursive=True)
     for file_path in input_files:
         # extract_from_mp3_to_midi(file_path)
-        extract_from_midi_to_midi(file_path)
+        extract_from_midi_to_midi(file_path, output)
 
 def main():
-    process_folder('extraction_examples/inputs/')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', type=str, default='./lmd_full')
+    parser.add_argument('--output', type=str, default='')
+    args = parser.parse_args()
+
+    process_folder(folder=args.input, output=args.output)
 
 if __name__ == '__main__':
   main()
