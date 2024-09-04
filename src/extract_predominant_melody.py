@@ -170,6 +170,7 @@ def export_to_midi(audio_data, file_path, pitch_values, output):
 def process_folder(folder, output):
     # input_files = glob.glob(os.path.join(folder, '**/*.mp3'), recursive=True)
     input_files = glob.glob(os.path.join(folder, '**/*.mid'), recursive=True)
+    os.makedirs(output, exist_ok=True)
     for file_path in input_files:
         # extract_from_mp3_to_midi(file_path)
         extract_from_midi_to_midi(file_path, output)
@@ -177,7 +178,7 @@ def process_folder(folder, output):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, default='./lmd_full')
-    parser.add_argument('--output', type=str, default='')
+    parser.add_argument('--output', type=str, default='./preprocessed')
     args = parser.parse_args()
 
     process_folder(folder=args.input, output=args.output)
