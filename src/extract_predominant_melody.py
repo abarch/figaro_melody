@@ -7,6 +7,8 @@ import essentia.standard as es
 import numpy as np
 import pretty_midi
 
+import mido
+
 from copy import deepcopy
 
 SAMPLE_RATE = 44100.0
@@ -15,9 +17,9 @@ SAMPLE_RATE = 44100.0
 def extract_from_midi_to_midi(file_path, output):
   try:
     pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
-  except (OSError, EOFError) as err:
+  except (OSError, EOFError, ValueError, KeyError, mido.midifiles.meta.KeySignatureError) as err:
     print(f'ERROR Corrupt midi file {file_path}. Skipping it.')
-    print('Cause of corruption', err)
+    print('Cause of corruption:', str(err))
   else:
     # synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
     synth = pm_original.synthesize().astype(np.float32)
@@ -181,13 +183,13 @@ def process_folder(folder, output):
     # extract_from_mp3_to_midi(file_path)
     # Assuming that _melody.mid is also present when _accompaniment.mid is
     possibly_existing_outfile_path = os.path.join(output, f'{Path(file_path).stem}_accompaniment.mid')
-    print('Checking if file exists: ', possibly_existing_outfile_path)
     # breakpoint()
     if not os.path.exists(possibly_existing_outfile_path):
-      # print('Does not exist')
-      extract_from_midi_to_midi(file_path, output)
+      if not file_path in ('../lmd_full/e/e3de19fed976d515437604f7ac0d34a4.mid', '../lmd_full/f/fd93b44a6e334ec2d9ead40a92dcca52.mid', '../lmd_full/e/e363d6d94eb8ad76fa6694f31ec6c79d.mid', '../lmd_full/0/069a3ce3c45b7e15f46138c5e5a67469.mid', '../lmd_full/f/f94b0d40a3388bf932504d1906bec35e.mid', '../lmd_full/e/e7999e9c714f39adfbd9775794daa46b.mid', '../lmd_full/0/0531e73378d4fc4f86ffad4bce283f5a.mid', '../lmd_full/e/e2c42da8bccf9c8067d6bc3af9b957e6.mid', '../lmd_full/0/00a6fcf5afc65dee2a833291b4c11b0c.mid'):
+        print('Processing', file_path)
+        extract_from_midi_to_midi(file_path, output)
     else:
-      print('Exists. Skipping')
+      print(f'Skipping {file_path}. Already in {output}')
 
 
 def main():
