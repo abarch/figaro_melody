@@ -245,11 +245,7 @@ class MidiDataset(IterableDataset):
 
 
   def __iter__(self):
-    # TODO NOTE Disabled workers for now
-    # because _melody.mid files need to stay together with their respective _accompaniment.mid file for melody processing
-    # -> This results in self.split = [[self.files]]
-    # worker_info = torch.utils.data.get_worker_info()
-    worker_info = None
+    worker_info = torch.utils.data.get_worker_info()
     self.split = _get_split(self.files, worker_info)
 
     split_len = len(self.split)
