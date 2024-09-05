@@ -15,8 +15,9 @@ SAMPLE_RATE = 44100.0
 def extract_from_midi_to_midi(file_path, output):
   try:
     pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
-  except OSError:
+  except (OSError, EOFError) as err:
     print(f'ERROR Corrupt midi file {file_path}. Skipping it.')
+    print('Cause of corruption', err)
   else:
     # synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
     synth = pm_original.synthesize().astype(np.float32)
@@ -178,7 +179,15 @@ def process_folder(folder, output):
   os.makedirs(output, exist_ok=True)
   for file_path in input_files:
     # extract_from_mp3_to_midi(file_path)
-    extract_from_midi_to_midi(file_path, output)
+    # Assuming that _melody.mid is also present when _accompaniment.mid is
+    possibly_existing_outfile_path = os.path.join(output, f'{Path(file_path).stem}_accompaniment.mid')
+    print('Checking if file exists: ', possibly_existing_outfile_path)
+    # breakpoint()
+    if not os.path.exists(possibly_existing_outfile_path):
+      # print('Does not exist')
+      extract_from_midi_to_midi(file_path, output)
+    else:
+      print('Exists. Skipping')
 
 
 def main():
