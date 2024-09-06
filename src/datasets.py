@@ -249,7 +249,7 @@ class MidiDataset(IterableDataset):
     self.split = _get_split(self.files, worker_info)
 
     split_len = len(self.split)
-    
+
     for i in range(split_len):
       try:
         current_file = self.load_file(self.split[i])

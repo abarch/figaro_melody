@@ -108,16 +108,19 @@ class InputRepresentation():
     self.chords = None
     self.groups = None
 
-    self._read_items()
+    self._read_items(strict=strict)
     self._quantize_items()
     if do_extract_chords:
       self.extract_chords()
     self._group_items()
 
-    if strict and len(self.note_items) == 0:
-      raise ValueError("Invalid MIDI file: No notes found, empty file.")
+    # This is checked at the end of _process_pm_to_note_items() now
+    # in favour of melody file processing
+    # if strict and len(self.note_items) == 0:
+    #   raise ValueError("Invalid MIDI file: No notes found, empty file.")
 
-  def _process_pm_to_note_items(self, pm_to_read, note_item_identifier='Note'):
+  def _process_pm_to_note_items(self, pm_to_read, note_item_identifier='Note', strict=False):
+    note_items_from_pm_to_read = []
     for instrument in pm_to_read.instruments:
       pedal_events = [event for event in instrument.control_changes if event.number == 64]
       pedal_pressed = False
@@ -149,7 +152,7 @@ class InputRepresentation():
         else:
           pedal = Item(name='Pedal', start=0, end=0)
 
-        self.note_items.append(Item(
+        note_items_from_pm_to_read.append(Item(
           name=note_item_identifier,
           start=pm_to_read.time_to_tick(note.start),
           end=pm_to_read.time_to_tick(max(note.end, pedal.end)),
@@ -157,14 +160,17 @@ class InputRepresentation():
           pitch=note.pitch,
           instrument=instrument_name))
 
-  # read notes and tempo changes from midi (assume there is only one track)
-  def _read_items(self):
-    # note
-    self.note_items = []
+    if strict and len(note_items_from_pm_to_read) == 0:
+      raise ValueError("Invalid MIDI file: No notes found, empty file.")
 
-    self._process_pm_to_note_items(pm_to_read=self.pm)
+    return note_items_from_pm_to_read
+
+  # read notes and tempo changes from midi (assume there is only one track)
+  def _read_items(self, strict=False):
+    # note
+    self.note_items = self._process_pm_to_note_items(pm_to_read=self.pm, strict=strict)
     if self.separated_melody:
-      self._process_pm_to_note_items(pm_to_read=self.pm_mel, note_item_identifier='Melody')
+      self.note_items.extend(self._process_pm_to_note_items(pm_to_read=self.pm_mel, note_item_identifier='Melody', strict=strict))
 
     self.note_items.sort(key=lambda x: (x.start, x.pitch))
 
