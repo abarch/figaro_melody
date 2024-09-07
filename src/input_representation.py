@@ -575,11 +575,18 @@ class InputRepresentation():
           mel_instr_events.add(Event(
             name=MELODY_INSTRUMENT_KEY,
             time=None,
-            value=mel_note.instrument,
-            text=mel_note.instrument
+            value=pretty_midi.program_to_instrument_name(mel_note.instrument),
+            text=pretty_midi.program_to_instrument_name(mel_note.instrument)
           ))
+
+          # Fit velocity and duration into bin values to reduce vocab size
+          vel_idx = np.argmin(abs(DEFAULT_VELOCITY_BINS - mel_note.velocity))
+          velocity = DEFAULT_VELOCITY_BINS[vel_idx]
+          dur_idx = np.argmin(abs(DEFAULT_DURATION_BINS - (mel_note.end - mel_note.start)))
+          duration = DEFAULT_DURATION_BINS[dur_idx]
+
           # Melody note value get saved as a single Event with shape pitch;velocity;duration
-          mel_note_value = '{};{};{}'.format(mel_note.pitch, mel_note.velocity, mel_note.end - mel_note.start)
+          mel_note_value = '{};{};{}'.format(mel_note.pitch, velocity, duration)
           mel_note_events.append(Event(
             name=MELODY_NOTE_KEY,
             time=None,

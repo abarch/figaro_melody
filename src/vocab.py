@@ -103,8 +103,8 @@ class Tokens:
 
     # Shape: Melody Note_(pitch);(velocity);(duration)
     pitch_values = list(range(128))
-    velocity_values = list(range(len(DEFAULT_VELOCITY_BINS)))
-    duration_values = list(range(len(DEFAULT_DURATION_BINS)))
+    velocity_values = DEFAULT_VELOCITY_BINS
+    duration_values = DEFAULT_DURATION_BINS
     note_tokens = [f'{melody_note_key}_{p};{v};{d}' for p in pitch_values for v in velocity_values for d in duration_values]
     return instrument_tokens + note_tokens
 
