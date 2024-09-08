@@ -170,7 +170,9 @@ class InputRepresentation():
     # note
     self.note_items = self._process_pm_to_note_items(pm_to_read=self.pm, strict=strict)
     if self.separated_melody:
-      self.note_items.extend(self._process_pm_to_note_items(pm_to_read=self.pm_mel, note_item_identifier='Melody', strict=strict))
+      # Ensures that notes are unique and remain in order
+      melody_note_items = list(dict.fromkeys(self._process_pm_to_note_items(pm_to_read=self.pm_mel, note_item_identifier='Melody', strict=strict)))
+      self.note_items.extend(melody_note_items)
 
     self.note_items.sort(key=lambda x: (x.start, x.pitch))
 
