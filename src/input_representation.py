@@ -98,7 +98,7 @@ class InputRepresentation():
     if strict and len(self.pm.time_signature_changes) == 0:
       raise ValueError("Invalid MIDI file: No time signature defined")
 
-    if strict and len(self.pm_mel.time_signature_changes) == 0:
+    if self.separated_melody and strict and len(self.pm_mel.time_signature_changes) == 0:
       raise ValueError("Invalid MIDI Melody file: No time signature defined")
 
     self.resolution = self.pm.resolution
