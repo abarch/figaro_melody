@@ -160,7 +160,8 @@ class VqVaeModule(pl.LightningModule):
                  decoder_ffn_dim=2048,
                  windowed_attention_pr=0.0,
                  max_lookahead=4,
-                 disable_vq=False):
+                 disable_vq=False,
+                 separated_melody_present=False):
         super().__init__()
 
         self.d_model = d_model
@@ -180,7 +181,7 @@ class VqVaeModule(pl.LightningModule):
         self.max_lookahead = max_lookahead
         self.disable_vq = disable_vq
 
-        self.vocab = RemiVocab()
+        self.vocab = RemiVocab(add_melody_tokens=separated_melody_present)
         
         self.pad_token = self.vocab.to_i(PAD_TOKEN)
         self.bos_token = self.vocab.to_i(BOS_TOKEN)
@@ -269,7 +270,7 @@ class VqVaeModule(pl.LightningModule):
         else:
             # VQ-VAE
             # Shape of z_q: (batch_size, d_model * n_groups)
-            dist = self.trainer.accelerator.training_type_plugin if self.training else None
+            dist = self.trainer.strategy if self.training else None
             return self.vq_embed(z_e, dist=dist)
 
 
@@ -349,11 +350,11 @@ class VqVaeModule(pl.LightningModule):
             'rec_loss': rec_loss,
             **out
         }
-    
-    def training_step(self, batch, batch_idx, optimizer_idx=0):
+
+    def training_step(self, batch, batch_idx):
         metrics = self.get_loss(batch)
         log_metrics = { key: metrics[key].detach() for key in ['loss', 'rec_loss', 'diff', 'avg_usage', 'usage', 'entropy'] if key in metrics }
-        self.log('train', log_metrics, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+        self.log_dict({'train/' + key: value for key, value in log_metrics.items()}, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
         return metrics['loss']
 
     def validation_step(self, batch, batch_idx):
@@ -371,7 +372,7 @@ class VqVaeModule(pl.LightningModule):
         ppl = (-log_pr.sum(dim=1) / t).exp().mean()
         log_metrics['ppl'] = ppl.detach()
 
-        self.log('valid', log_metrics, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+        self.log_dict({'valid/' + key: value for key, value in log_metrics.items()}, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
         # Log loss separately for model checkpoint monitor
         self.log('valid_loss', metrics['loss'], on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
         return metrics['loss']
@@ -380,7 +381,7 @@ class VqVaeModule(pl.LightningModule):
         metrics = self.get_loss(batch)
         return metrics['loss']
 
-    def on_train_batch_end(self, outputs, batch, batch_idx, dataloader_idx):
+    def on_train_batch_end(self, outputs, batch, batch_idx):
         step = self.trainer.global_step
 
         # # beta is increased for C*R steps and then held constant for C*(1-R) steps

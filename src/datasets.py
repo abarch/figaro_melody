@@ -428,6 +428,8 @@ class MidiDataset(IterableDataset):
     name = os.path.basename(file)
     if self.cache_path and self.use_cache:
       cache_file = os.path.join(self.cache_path, name)
+    else:
+      cache_file = None
 
     try:
       # Try to load the file in case it's already in the cache
@@ -483,6 +485,8 @@ class MidiDataset(IterableDataset):
   def get_latent_representation(self, events, cache_key=None, bar_token_mask='<mask>'):
     if cache_key and self.use_cache:
       cache_file = os.path.join(self.latent_cache_path, cache_key)
+    else:
+      cache_file = None
 
     try:
       latents, codes = pickle.load(open(cache_file, 'rb'))

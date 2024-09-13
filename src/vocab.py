@@ -141,11 +141,16 @@ class Vocab:
 
 
 class RemiVocab(Vocab):
-  def __init__(self):
+  def __init__(self, add_melody_tokens=False):
     midi_tokens = Tokens.get_midi_tokens()
     chord_tokens = Tokens.get_chord_tokens()
 
     self.tokens = midi_tokens + chord_tokens
+
+    if add_melody_tokens:
+      # _M for Melody notes, _A for Accompaniment notes
+      note_type_tokens = [f'{NOTE_TYPE_KEY}_M', f'{NOTE_TYPE_KEY}_A']
+      self.tokens += note_type_tokens
 
     counter = Counter(self.tokens)
     super().__init__(counter)

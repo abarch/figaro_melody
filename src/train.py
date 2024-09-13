@@ -81,6 +81,7 @@ def main():
 
   available_models = [
     'vq-vae',
+    'vq-vae-accomp',
     'figaro-learned',
     'figaro-expert',
     'figaro',
@@ -226,7 +227,7 @@ def main():
       ),
     }[MODEL]()
 
-  model.requires_grad_(requires_grad=True)
+  # model.requires_grad_(requires_grad=True)
 
   datamodule = model.get_datamodule(
     midi_files,

@@ -606,6 +606,7 @@ class InputRepresentation():
 #############################################################################################
 
 def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
+  # Unused
   vocab = RemiVocab()
 
   def _get_time(bar, position, bpm=120, positions_per_bar=48):
