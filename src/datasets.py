@@ -43,7 +43,8 @@ class MidiDataModule(pl.LightningDataModule):
     if self.description_flavor in ['latent', 'both']:
       assert self.vae_module is not None, "Description flavor 'latent' requires 'vae_module' to be present, but found 'None'"
 
-    self.vocab = RemiVocab()
+    self.separated_melody_present = False if description_options is None else description_options['separated_melody']
+    self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
 
     self.kwargs = kwargs
 
@@ -55,7 +56,7 @@ class MidiDataModule(pl.LightningDataModule):
     valid_files = self.files[n_test:n_test+n_valid]
     test_files = self.files[:n_test]
 
-    self.train_ds = MidiDataset(train_files, self.max_len, 
+    self.train_ds = MidiDataset(train_files, self.max_len,
       description_flavor=self.description_flavor,
       vae_module=self.vae_module,
       **self.kwargs
@@ -213,7 +214,6 @@ class MidiDataset(IterableDataset):
     self.use_cache = use_cache
     self.print_errors = print_errors
 
-    self.vocab = RemiVocab()
 
     self.description_flavor = description_flavor
     if self.description_flavor in ['latent', 'both']:
@@ -225,6 +225,7 @@ class MidiDataset(IterableDataset):
 
     self.separated_melody_present = False if description_options is None else description_options['separated_melody']
     self.desc_vocab = DescriptionVocab(add_melody_tokens=self.separated_melody_present)
+    self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
 
     self.bar_token_mask = bar_token_mask
     self.bar_token_idx = bar_token_idx
@@ -257,6 +258,7 @@ class MidiDataset(IterableDataset):
         if self.print_errors:
           print(err)
         # raise err
+        # Skips faulty files
         continue
 
       events = current_file['events']
@@ -359,7 +361,7 @@ class MidiDataset(IterableDataset):
           else:
             desc_ids = torch.cat([desc_ids, desc_eos])
             desc_bar_ids = torch.cat([desc_bar_ids, zero])
-          
+
           if self.max_len > 0:
             start, end = start_idx, start_idx + self.max_len + 1
             x['description'] = desc_ids[start:end]
@@ -367,7 +369,6 @@ class MidiDataset(IterableDataset):
           else:
             x['description'] = desc_ids[start:]
             x['desc_bar_ids'] = desc_bar_ids[start:]
-
         if self.description_flavor in ['latent', 'both']:
           x['latents'] = current_file['latents']
           x['codes'] = current_file['codes']

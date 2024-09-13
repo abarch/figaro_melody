@@ -22,6 +22,8 @@ from constants import (
   MEAN_DURATION_KEY,
   MELODY_INSTRUMENT_KEY,
   MELODY_NOTE_KEY,
+  NOTE_TYPE_KEY,
+
   # discretization parameters
   DEFAULT_POS_PER_QUARTER,
   DEFAULT_VELOCITY_BINS,
@@ -438,7 +440,8 @@ class InputRepresentation():
           value='{}'.format(index),
           text='{}/{}'.format(index+1, positions_per_bar))
 
-        if item.name in ['Note', 'Melody']:
+        if item.name == 'Note':
+        # if item.name in ['Note', 'Melody']:
           events.append(pos_event)
           self._process_note_item_to_events(events, item)
         elif item.name == 'Chord':
@@ -464,7 +467,7 @@ class InputRepresentation():
 
     return [f'{e.name}_{e.value}' for e in events]
 
-  def get_description(self, 
+  def get_description(self,
                       omit_time_sig=False,
                       omit_instruments=False,
                       omit_chords=False,
@@ -695,7 +698,8 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
         f"{INSTRUMENT_KEY}_" in events[i+1] and \
         f"{PITCH_KEY}_" in events[i+2] and \
         f"{VELOCITY_KEY}_" in events[i+3] and \
-        f"{DURATION_KEY}_" in events[i+4]:
+        f"{DURATION_KEY}_" in events[i+4] and \
+        f"{NOTE_TYPE_KEY}_" in events[i+5]:
 
       # get position
       position = int(events[i].split('_')[-1])
