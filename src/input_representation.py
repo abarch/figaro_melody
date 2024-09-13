@@ -374,6 +374,14 @@ class InputRepresentation():
       time=item.start,
       value=index,
       text='{}/{}'.format(duration, DEFAULT_DURATION_BINS[index])))
+    if self.separated_melody:
+      events.append(Event(
+        name=NOTE_TYPE_KEY,
+        time=item.start,
+        value='M' if item.name == 'Melody' else 'A',  # Melody / Accompaniment
+        text='M' if item.name == 'Melody' else 'A'
+        # text='Melody' if item.name == 'Melody' else 'Accompaniment'
+      ))
 
   # item to event
   def get_remi_events(self):
@@ -440,8 +448,7 @@ class InputRepresentation():
           value='{}'.format(index),
           text='{}/{}'.format(index+1, positions_per_bar))
 
-        if item.name == 'Note':
-        # if item.name in ['Note', 'Melody']:
+        if item.name in ['Note', 'Melody']:
           events.append(pos_event)
           self._process_note_item_to_events(events, item)
         elif item.name == 'Chord':

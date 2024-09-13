@@ -12,7 +12,8 @@ from vocab import RemiVocab, DescriptionVocab
 from constants import (
   PAD_TOKEN, BOS_TOKEN, EOS_TOKEN, BAR_KEY, POSITION_KEY,
   TIME_SIGNATURE_KEY, INSTRUMENT_KEY, CHORD_KEY,
-  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY, MELODY_NOTE_KEY, MELODY_INSTRUMENT_KEY
+  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY,
+  MELODY_NOTE_KEY, MELODY_INSTRUMENT_KEY, NOTE_TYPE_KEY
 )
 
 
@@ -27,7 +28,8 @@ class MidiDataModule(pl.LightningDataModule):
                num_workers=4,
                pin_memory=True, 
                description_flavor='none',
-               train_val_test_split=(0.95, 0.1, 0.05), 
+               train_val_test_split=(0.95, 0.1, 0.05),
+               description_options=None,
                vae_module=None,
                **kwargs):
     super().__init__()
@@ -449,7 +451,7 @@ class MidiDataset(IterableDataset):
             melody_file = file
             file = file.replace('_melody.mid', '_accompaniment.mid')
           else:
-            print('ERROR: Unkown file found! File name has to end with _melody.mid or _accompaniment.mid when model is figaro-melody', name)
+            raise ValueError('Unkown file found! File name has to end with _melody.mid or _accompaniment.mid when model is figaro-melody', name)
           rep = InputRepresentation(file, strict=True, melody_file=melody_file)
         else:
           rep = InputRepresentation(file, strict=True)
@@ -473,7 +475,12 @@ class MidiDataset(IterableDataset):
           print('Unable to cache file:', str(err))
 
     if self.description_flavor in ['latent', 'both']:
-      latents, codes = self.get_latent_representation(sample['events'], name)
+      if self.separated_melody_present:
+        # If melody and accompaniment are separated, add only accompaniment notes into latents
+        latent_events = [e for e in sample['events'] if e == f'{NOTE_TYPE_KEY}_A']
+      else:
+        latent_events = sample['events']
+      latents, codes = self.get_latent_representation(latent_events, name)
       sample['latents'] = latents
       sample['codes'] = codes
 

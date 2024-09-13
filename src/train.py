@@ -195,22 +195,6 @@ def main():
         d_latent=D_LATENT,
         separated_melody_present=True
       ),
-      'vq-vae-accomp': lambda: VqVaeModule(
-        encoder_layers=4,
-        decoder_layers=6,
-        encoder_ffn_dim=2048,
-        decoder_ffn_dim=2048,
-        n_codes=N_CODES,
-        n_groups=N_GROUPS,
-        context_size=MAX_CONTEXT,
-        lr=LEARNING_RATE,
-        lr_schedule=LR_SCHEDULE,
-        warmup_steps=WARMUP_STEPS,
-        max_steps=MAX_STEPS,
-        d_model=D_MODEL,
-        d_latent=D_LATENT,
-        separated_melody_present=True
-      ),
       'figaro-learned': lambda: Seq2SeqModule(
         description_flavor='latent',
         n_codes=vae_module.n_codes,
