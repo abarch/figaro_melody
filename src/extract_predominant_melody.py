@@ -2,12 +2,15 @@ import argparse
 import glob
 import os
 from pathlib import Path
+import warnings
 
 import essentia.standard as es
 import numpy as np
 import pretty_midi
 
 import mido
+
+import time
 
 from copy import deepcopy
 
@@ -122,12 +125,16 @@ def extract_from_midi_to_midi(file_path, output):
     print('Processed notes', processed_orig_notes)
     print('Removed notes', removed_notes)
 
+    # With clean_midi (lmd) as input:
+    p = Path(file_path)
+    nfile_path = f'{p.parts[-2]} - {p.parts[-1]}'  # with clean_midi (lmd) as input
+
     # Save to midi file
-    out_path_mel = os.path.join(output, f'{Path(file_path).stem}_melody.mid')
+    out_path_mel = os.path.join(output, f'{Path(nfile_path).stem}_melody.mid')
     pm_melody.write(out_path_mel)
     print('Melody result written to', out_path_mel)
 
-    out_path_accomp = os.path.join(output, f'{Path(file_path).stem}_accompaniment.mid')
+    out_path_accomp = os.path.join(output, f'{Path(nfile_path).stem}_accompaniment.mid')
     # Debugging
     # out_path_accomp = os.path.join(output, f'{Path(file_path).stem}_accompaniment_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid')
     pm_original.write(out_path_accomp)
@@ -182,23 +189,42 @@ def process_folder(folder, output):
   for file_path in input_files:
     # extract_from_mp3_to_midi(file_path)
     # Assuming that _melody.mid is also present when _accompaniment.mid is
-    possibly_existing_outfile_path = os.path.join(output, f'{Path(file_path).stem}_accompaniment.mid')
+    
+    # Converts folder structures like 'artist/song.mid' to 'artist - song.mid'
+    p = Path(file_path)
+    planned_outpath = f'{p.parts[-2]} - {p.parts[-1]}'  # with clean_midi (lmd) as input
+    possibly_existing_outfile_path = os.path.join(output, f'{Path(planned_outpath).stem}_accompaniment.mid')
     # breakpoint()
     if not os.path.exists(possibly_existing_outfile_path):
-      if not file_path in ('../lmd_full/e/e3de19fed976d515437604f7ac0d34a4.mid', '../lmd_full/f/fd93b44a6e334ec2d9ead40a92dcca52.mid', '../lmd_full/e/e363d6d94eb8ad76fa6694f31ec6c79d.mid', '../lmd_full/0/069a3ce3c45b7e15f46138c5e5a67469.mid', '../lmd_full/f/f94b0d40a3388bf932504d1906bec35e.mid', '../lmd_full/e/e7999e9c714f39adfbd9775794daa46b.mid', '../lmd_full/0/0531e73378d4fc4f86ffad4bce283f5a.mid', '../lmd_full/e/e2c42da8bccf9c8067d6bc3af9b957e6.mid', '../lmd_full/0/00a6fcf5afc65dee2a833291b4c11b0c.mid'):
-        print('Processing', file_path)
-        extract_from_midi_to_midi(file_path, output)
+      # if not file_path in ('../lmd_full/e/e3de19fed976d515437604f7ac0d34a4.mid', '../lmd_full/f/fd93b44a6e334ec2d9ead40a92dcca52.mid', '../lmd_full/e/e363d6d94eb8ad76fa6694f31ec6c79d.mid', '../lmd_full/0/069a3ce3c45b7e15f46138c5e5a67469.mid', '../lmd_full/f/f94b0d40a3388bf932504d1906bec35e.mid', '../lmd_full/e/e7999e9c714f39adfbd9775794daa46b.mid', '../lmd_full/0/0531e73378d4fc4f86ffad4bce283f5a.mid', '../lmd_full/e/e2c42da8bccf9c8067d6bc3af9b957e6.mid', '../lmd_full/0/00a6fcf5afc65dee2a833291b4c11b0c.mid'):
+      # if not file_path in ('../clean_midi/U2/The Electric Co..mid'):
+      print('Processing', file_path)
+      if len(planned_outpath) < 210:  # Prevent error for output filename being too long upon saving the result
+        try:
+          extract_from_midi_to_midi(file_path, output)
+        except RuntimeWarning as w:
+          print(f'Skipping {file_path}. RuntimeWarning encountered:', w)
+      else:
+        print(f'Skipping {file_path}. Output name presumably too long. Len:', len(planned_outpath))
     else:
       print(f'Skipping {file_path}. Already in {output}')
 
 
 def main():
+  # Convert RuntimeWarnings to errors so the can be caught in process_folder
+  warnings.simplefilter(action='error', category=RuntimeWarning)
   parser = argparse.ArgumentParser()
   parser.add_argument('--input', type=str, default='./lmd_full')
   parser.add_argument('--output', type=str, default='./preprocessed')
   args = parser.parse_args()
 
+  start_time = time.time()
+
   process_folder(folder=args.input, output=args.output)
+
+  end_time = time.time()
+
+  print('Execution time (in s):', end_time - start_time)
 
 if __name__ == '__main__':
   main()
