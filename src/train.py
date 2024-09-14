@@ -218,7 +218,7 @@ def main():
         n_codes=vae_module.n_codes,
         n_groups=vae_module.n_groups,
         d_latent=vae_module.d_latent,
-        description_options={ 'instruments': True, 'chords': True, 'meta': True, 'separated_melody': True },
+        description_options={ 'instruments': True, 'chords': False, 'meta': True, 'separated_melody': True },
         **seq2seq_kwargs
       ),
       'figaro-no-meta': lambda: Seq2SeqModule(

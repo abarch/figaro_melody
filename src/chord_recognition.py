@@ -228,8 +228,8 @@ class MIDIChord(object):
 
   def extract(self):
     # read
-    beats = self.pm.get_beats()
-    chroma = self.pm.get_chroma(times=beats)
+    beats = self.pm.get_beats()  # TODO merge with melody
+    chroma = self.pm.get_chroma(times=beats)  # TODO merge with melody
     # get lots of candidates
     candidates = self.get_candidates(chroma, max_tick=len(beats))
     
@@ -241,7 +241,7 @@ class MIDIChord(object):
     for chord in chords:
       chord[0] = beats[chord[0]]
       if chord[1] >= len(beats):
-        chord[1] = self.pm.get_end_time()
+        chord[1] = self.pm.get_end_time()  # TODO merge with melody
       else:
         chord[1] = beats[chord[1]]
     return chords

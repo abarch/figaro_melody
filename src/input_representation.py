@@ -79,6 +79,13 @@ class InputRepresentation():
   def version():
     return 'v4'
 
+   # Utility to combine lists of accompaniment and melody properties
+  def _merge_lists(self, accompaniment:np.ndarray, melody:np.ndarray):
+    ret_list = np.concatenate((melody, accompaniment))
+    ret_list.sort()
+    # return list(dict.fromkeys(ret_list))
+    return np.unique(ret_list)
+
   def __init__(self, file, do_extract_chords=True, strict=False, melody_file=None):
     # If melody_file is given item type 'Note' represents the accompaniment (non-melody) notes of the song
     # file and melody_file are obtained from the same song via preprocessing with extract_predominant_melody.py
@@ -109,6 +116,11 @@ class InputRepresentation():
     self.tempo_items = None
     self.chords = None
     self.groups = None
+
+    if self.separated_melody:
+      self.end_time = max(self.pm.get_end_time(), self.pm_mel.get_end_time())
+    else:
+      self.end_time = self.pm.get_end_time()
 
     self._read_items(strict=strict)
     self._quantize_items()
@@ -180,7 +192,10 @@ class InputRepresentation():
 
     # tempo
     self.tempo_items = []
-    times, tempi = self.pm.get_tempo_changes()
+    if self.separated_melody:
+      times, tempi = self._merge_lists(self.pm.get_tempo_changes(), self.pm_mel.get_tempo_changes())
+    else:
+      times, tempi = self.pm.get_tempo_changes()
     for time, tempo in zip(times, tempi):
       self.tempo_items.append(Item(
         name='Tempo',
@@ -190,7 +205,7 @@ class InputRepresentation():
         pitch=int(tempo)))
     self.tempo_items.sort(key=lambda x: x.start)
     # expand to all beat
-    max_tick = self.pm.time_to_tick(self.pm.get_end_time())
+    max_tick = self.pm.time_to_tick(self.end_time)
     existing_ticks = {item.start: item.pitch for item in self.tempo_items}
     wanted_ticks = np.arange(0, max_tick+1, DEFAULT_RESOLUTION)
     output = []
@@ -215,7 +230,7 @@ class InputRepresentation():
   def _quantize_items(self):
     ticks = self.resolution / DEFAULT_POS_PER_QUARTER
     # grid
-    end_tick = self.pm.time_to_tick(self.pm.get_end_time())
+    end_tick = self.pm.time_to_tick(self.end_time)
     grids = np.arange(0, max(self.resolution, end_tick), ticks)
     # process
     for item in self.note_items:
@@ -227,17 +242,17 @@ class InputRepresentation():
       item.end += shift
 
   def get_end_tick(self):
-    return self.pm.time_to_tick(self.pm.get_end_time())
+    return self.pm.time_to_tick(self.end_time)
 
   # NOTE: Chord is the same for melody and accompaniment
   # extract chord
   def extract_chords(self):
-    end_tick = self.pm.time_to_tick(self.pm.get_end_time())
+    end_tick = self.pm.time_to_tick(self.end_time)
     if end_tick < self.resolution:
       # If sequence is shorter than 1/4th note, it's probably empty
       self.chords = []
       return self.chords
-    method = MIDIChord(self.pm)
+    method = MIDIChord(self.pm)  # TODO merge with melody
     chords = method.extract()
     output = []
     for chord in chords:
@@ -249,7 +264,7 @@ class InputRepresentation():
         pitch=chord[2].split('/')[0]))
     if len(output) == 0 or output[0].start > 0:
       if len(output) == 0:
-        end = self.pm.time_to_tick(self.pm.get_end_time())
+        end = self.pm.time_to_tick(self.end_time)
       else:
         end = output[0].start
       output.append(Item(
@@ -291,8 +306,12 @@ class InputRepresentation():
       )
 
     items.sort(key=_get_key)
-    downbeats = self.pm.get_downbeats()
-    downbeats = np.concatenate([downbeats, [self.pm.get_end_time()]])
+    if self.separated_melody:
+      downbeats = self._merge_lists(self.pm.get_downbeats(), self.pm_mel.get_downbeats())
+    else:
+      downbeats = self.pm.get_downbeats()
+
+    downbeats = np.concatenate([downbeats, [self.end_time]])
     self.groups = []
     for db1, db2 in zip(downbeats[:-1], downbeats[1:]):
       db1, db2 = self.pm.time_to_tick(db1), self.pm.time_to_tick(db2)
@@ -316,15 +335,28 @@ class InputRepresentation():
     return self.groups
   
   def _get_time_signature(self, start):
+    if self.separated_melody:
+      # Merge time_signatures from melody and accompaniment
+      time_sig_dict = {}
+      # Manual set-like implementation because TimeSignature class misses __eq__ and __hash__ methods needed for a set
+      combined_ts = self.pm.time_signature_changes + self.pm_mel.time_signature_changes
+      for ts in combined_ts:
+        time_sig_dict[repr(ts)] = ts
+
+      time_sig_list = list(time_sig_dict.values())
+      time_sig_list.sort(key=lambda x: x.time)
+    else:
+      time_sig_list = self.pm.time_signature_changes
+
     # This method assumes that time signature changes don't happen within a bar
     # which is a convention that commonly holds
     time_sig = None
-    for curr_sig, next_sig in zip(self.pm.time_signature_changes[:-1], self.pm.time_signature_changes[1:]):
+    for curr_sig, next_sig in zip(time_sig_list[:-1], time_sig_list[1:]):
       if self.pm.time_to_tick(curr_sig.time) <= start and self.pm.time_to_tick(next_sig.time) > start:
         time_sig = curr_sig
         break
     if time_sig is None:
-      time_sig = self.pm.time_signature_changes[-1]
+      time_sig = time_sig_list[-1]
     return time_sig
 
   def _get_ticks_per_bar(self, start):
