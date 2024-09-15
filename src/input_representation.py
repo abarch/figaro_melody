@@ -732,7 +732,7 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
         last_tl_event['pos'] = (bar, position)
         last_tl_event['tempo'] = tempo
 
-    elif i+4 < len(events) and \
+    elif i+5 < len(events) and \
         f"{POSITION_KEY}_" in events[i] and \
         f"{INSTRUMENT_KEY}_" in events[i+1] and \
         f"{PITCH_KEY}_" in events[i+2] and \
