@@ -66,7 +66,8 @@ class Seq2SeqModule(pl.LightningModule):
     self.warmup_steps = warmup_steps
     self.max_steps = max_steps
 
-    self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
+    # self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
+    self.vocab = RemiVocab()
 
     encoder_config = BertConfig(
       vocab_size=1,
@@ -236,12 +237,12 @@ class Seq2SeqModule(pl.LightningModule):
     else:
       z, desc_bar_ids = None, None
 
-    
+
     logits = self(x, z=z, labels=labels, bar_ids=bar_ids, position_ids=position_ids, description_bar_ids=desc_bar_ids)
     # Shape of logits: (batch_size, tgt_len, tuple_size, vocab_size)
     pred = logits.view(-1, logits.shape[-1])
     labels = labels.reshape(-1)
-    
+
     loss = self.loss_fn(pred, labels)
 
     if return_logits:

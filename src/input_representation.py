@@ -22,7 +22,7 @@ from constants import (
   MEAN_DURATION_KEY,
   MELODY_INSTRUMENT_KEY,
   MELODY_NOTE_KEY,
-  NOTE_TYPE_KEY,
+  # NOTE_TYPE_KEY,
 
   # discretization parameters
   DEFAULT_POS_PER_QUARTER,
@@ -374,7 +374,8 @@ class InputRepresentation():
   def tick_to_position(self, tick):
     return round(tick / self.pm.resolution * DEFAULT_POS_PER_QUARTER)
 
-  def _process_note_item_to_events(self, events, item):
+  def _process_note_item_to_events(self, item):
+    events = []
     # instrument
     if item.instrument == 'drum':
       name = 'drum'
@@ -406,18 +407,30 @@ class InputRepresentation():
       time=item.start,
       value=index,
       text='{}/{}'.format(duration, DEFAULT_DURATION_BINS[index])))
-    if self.separated_melody:
-      events.append(Event(
-        name=NOTE_TYPE_KEY,
-        time=item.start,
-        value='M' if item.name == 'Melody' else 'A',  # Melody / Accompaniment
-        text='M' if item.name == 'Melody' else 'A'
-        # text='Melody' if item.name == 'Melody' else 'Accompaniment'
-      ))
+    # if self.separated_melody:
+    #   events.append(Event(
+    #     name=NOTE_TYPE_KEY,
+    #     time=item.start,
+    #     value='M' if item.name == 'Melody' else 'A',  # Melody / Accompaniment
+    #     text='M' if item.name == 'Melody' else 'A'
+    #     # text='Melody' if item.name == 'Melody' else 'Accompaniment'
+    #   ))
+    return events
 
   # item to event
   def get_remi_events(self):
-    events = []
+    # [all events], [accompaniment events]
+    events = [], []
+
+    # Utility method to save space
+    def _append_event_as_string(event: Event):
+      str_event = f'{event.name}_{event.value}'
+      # main list
+      events[0].append(str_event)
+      # accompaniment list (Does not contain melody notes)
+      if self.separated_melody:
+        events[1].append(str_event)
+
     n_downbeat = 0
     current_chord = None
     current_tempo = None
@@ -428,14 +441,14 @@ class InputRepresentation():
       if positions_per_bar <= 0:
         raise ValueError('Invalid REMI file: There must be at least 1 position per bar.')
 
-      events.append(Event(
+      _append_event_as_string(Event(
         name=BAR_KEY,
         time=None, 
         value='{}'.format(n_downbeat),
         text='{}'.format(n_downbeat)))
 
       time_sig = self._get_time_signature(bar_st)
-      events.append(Event(
+      _append_event_as_string(Event(
         name=TIME_SIGNATURE_KEY,
         time=None,
         value='{}/{}'.format(time_sig.numerator, time_sig.denominator),
@@ -443,26 +456,26 @@ class InputRepresentation():
       ))
 
       if current_chord is not None:
-        events.append(Event(
+        _append_event_as_string(Event(
           name=POSITION_KEY, 
           time=0,
           value='{}'.format(0),
           text='{}/{}'.format(1, positions_per_bar)))
-        events.append(Event(
+        _append_event_as_string(Event(
           name=CHORD_KEY,
           time=current_chord.start,
           value=current_chord.pitch,
           text='{}'.format(current_chord.pitch)))
       
       if current_tempo is not None:
-        events.append(Event(
+        _append_event_as_string(Event(
           name=POSITION_KEY, 
           time=0,
           value='{}'.format(0),
           text='{}/{}'.format(1, positions_per_bar)))
         tempo = current_tempo.pitch
         index = np.argmin(abs(DEFAULT_TEMPO_BINS-tempo))
-        events.append(Event(
+        _append_event_as_string(Event(
           name=TEMPO_KEY,
           time=current_tempo.start,
           value=index,
@@ -481,12 +494,16 @@ class InputRepresentation():
           text='{}/{}'.format(index+1, positions_per_bar))
 
         if item.name in ['Note', 'Melody']:
-          events.append(pos_event)
-          self._process_note_item_to_events(events, item)
+          _append_event_as_string(pos_event)
+          note_event_strings = [f'{e.name}_{e.value}' for e in self._process_note_item_to_events(item)]
+          events[0].extend(note_event_strings)
+          # Only save accompaniment notes into second list in case the melody is separated
+          if self.separated_melody and item.name == 'Notes':
+            events[1].extend(note_event_strings)
         elif item.name == 'Chord':
           if current_chord is None or item.pitch != current_chord.pitch:
-            events.append(pos_event)
-            events.append(Event(
+            _append_event_as_string(pos_event)
+            _append_event_as_string(Event(
               name=CHORD_KEY, 
               time=item.start,
               value=item.pitch,
@@ -494,17 +511,17 @@ class InputRepresentation():
             current_chord = item
         elif item.name == 'Tempo':
           if current_tempo is None or item.pitch != current_tempo.pitch:
-            events.append(pos_event)
+            _append_event_as_string(pos_event)
             tempo = item.pitch
             index = np.argmin(abs(DEFAULT_TEMPO_BINS-tempo))
-            events.append(Event(
+            _append_event_as_string(Event(
               name=TEMPO_KEY,
               time=item.start,
               value=index,
               text='{}/{}'.format(tempo, DEFAULT_TEMPO_BINS[index])))
             current_tempo = item
 
-    return [f'{e.name}_{e.value}' for e in events]
+    return events
 
   def get_description(self,
                       omit_time_sig=False,
@@ -732,13 +749,14 @@ def remi2midi(events, bpm=120, time_signature=(4, 4), polyphony_limit=16):
         last_tl_event['pos'] = (bar, position)
         last_tl_event['tempo'] = tempo
 
-    elif i+5 < len(events) and \
+    # elif i+5 < len(events) and \
+    elif i+4 < len(events) and \
         f"{POSITION_KEY}_" in events[i] and \
         f"{INSTRUMENT_KEY}_" in events[i+1] and \
         f"{PITCH_KEY}_" in events[i+2] and \
         f"{VELOCITY_KEY}_" in events[i+3] and \
-        f"{DURATION_KEY}_" in events[i+4] and \
-        f"{NOTE_TYPE_KEY}_" in events[i+5]:
+        f"{DURATION_KEY}_" in events[i+4]:
+        # f"{NOTE_TYPE_KEY}_" in events[i+5]:
 
       # get position
       position = int(events[i].split('_')[-1])

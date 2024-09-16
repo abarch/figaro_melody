@@ -40,8 +40,8 @@ from constants import (
   MEAN_VELOCITY_KEY,
   MEAN_DURATION_KEY,
   MELODY_NOTE_KEY,
-  MELODY_INSTRUMENT_KEY,
-  NOTE_TYPE_KEY
+  MELODY_INSTRUMENT_KEY  #,
+  # NOTE_TYPE_KEY
 )
 
 class Tokens:
@@ -142,16 +142,17 @@ class Vocab:
 
 
 class RemiVocab(Vocab):
-  def __init__(self, add_melody_tokens=False):
+  def __init__(self):
+  # def __init__(self, add_melody_tokens=False):
     midi_tokens = Tokens.get_midi_tokens()
     chord_tokens = Tokens.get_chord_tokens()
 
     self.tokens = midi_tokens + chord_tokens
 
-    if add_melody_tokens:
-      # _M for Melody notes, _A for Accompaniment notes
-      note_type_tokens = [f'{NOTE_TYPE_KEY}_M', f'{NOTE_TYPE_KEY}_A']
-      self.tokens += note_type_tokens
+    # if add_melody_tokens:
+    #   # _M for Melody notes, _A for Accompaniment notes
+    #   note_type_tokens = [f'{NOTE_TYPE_KEY}_M', f'{NOTE_TYPE_KEY}_A']
+    #   self.tokens += note_type_tokens
 
     counter = Counter(self.tokens)
     super().__init__(counter)

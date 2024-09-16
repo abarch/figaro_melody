@@ -1,5 +1,3 @@
-
-
 import pytorch_lightning as pl
 import torch.optim
 import torch.nn as nn
@@ -161,7 +159,7 @@ class VqVaeModule(pl.LightningModule):
                  windowed_attention_pr=0.0,
                  max_lookahead=4,
                  disable_vq=False,
-                 separated_melody_present=False):
+                 separated_melody_present=False):  # DNOTE Ohne Note Type egal
         super().__init__()
 
         self.d_model = d_model
@@ -181,8 +179,9 @@ class VqVaeModule(pl.LightningModule):
         self.max_lookahead = max_lookahead
         self.disable_vq = disable_vq
 
-        self.vocab = RemiVocab(add_melody_tokens=separated_melody_present)
-        
+        # self.vocab = RemiVocab(add_melody_tokens=separated_melody_present)
+        self.vocab = RemiVocab()
+
         self.pad_token = self.vocab.to_i(PAD_TOKEN)
         self.bos_token = self.vocab.to_i(BOS_TOKEN)
         self.eos_token = self.vocab.to_i(EOS_TOKEN)
@@ -217,7 +216,7 @@ class VqVaeModule(pl.LightningModule):
 
         self.in_layer = nn.Embedding(len(self.vocab), self.d_model)
         self.out_layer = nn.Linear(self.d_model, len(self.vocab), bias=False)
-        
+
         self.vq_embed = VectorQuantizeEMA(self.d_latent, self.n_codes, self.n_groups)
         self.pooling = nn.Linear(self.d_model, self.d_latent, bias=False)
         self.unpooling = nn.Linear(self.d_latent, self.d_model, bias=False)
@@ -226,7 +225,7 @@ class VqVaeModule(pl.LightningModule):
         self.rec_loss = nn.CrossEntropyLoss(ignore_index=self.pad_token)
 
         self.save_hyperparameters()
-    
+
     def get_datamodule(self, midi_files, **kwargs):
         return MidiDataModule(
             midi_files, 
@@ -244,13 +243,12 @@ class VqVaeModule(pl.LightningModule):
         if latent is None:
             encoder_out = self.encode(x)
             latent = encoder_out['z']
-        
+
         logits = self.decode(x, latent, use_windowed_attention)
         return {
             'logits': logits,
             **encoder_out
         }
-            
 
     def embed(self, x):
         return self.in_layer(x)
@@ -272,7 +270,6 @@ class VqVaeModule(pl.LightningModule):
             # Shape of z_q: (batch_size, d_model * n_groups)
             dist = self.trainer.strategy if self.training else None
             return self.vq_embed(z_e, dist=dist)
-
 
     def decode(self, x, latent, use_windowed_attention=False):
         # Shape of latent: (batch_size, n_groups, d_model)
@@ -297,7 +294,6 @@ class VqVaeModule(pl.LightningModule):
         padding[:, :x_emb.size(1)] = x_emb
         x_emb = padding
 
-
         if self.training or use_windowed_attention:
             attention_mask = self.rand_attention_mask(x)
         else:
@@ -314,7 +310,7 @@ class VqVaeModule(pl.LightningModule):
         )
         hidden = out.hidden_states[-1][:, :seq_len]
         logits = self.out_layer(hidden).contiguous()
-        
+
         return logits
 
     def get_loss(self, batch, windowed_attention_pr=None):
@@ -344,7 +340,7 @@ class VqVaeModule(pl.LightningModule):
         else:
             diff = out['diff']
             loss = rec_loss + self.beta*diff
-        
+
         return {
             'loss': loss,
             'rec_loss': rec_loss,
@@ -376,7 +372,7 @@ class VqVaeModule(pl.LightningModule):
         # Log loss separately for model checkpoint monitor
         self.log('valid_loss', metrics['loss'], on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
         return metrics['loss']
-    
+
     def test_step(self, batch, batch_idx):
         metrics = self.get_loss(batch)
         return metrics['loss']
@@ -410,7 +406,7 @@ class VqVaeModule(pl.LightningModule):
         else:
             # Use no lr scheduling
             lr_func = lambda step: self.lr
-        
+
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_func)
         return [optimizer], [{
             'scheduler': scheduler,
@@ -425,7 +421,7 @@ class VqVaeModule(pl.LightningModule):
         else:
             mask_size, k = 1, 1
         return self.get_attention_mask(x, mask_size=mask_size, k=k)
-    
+
     def get_attention_mask(self, x, mask_size=1, k=1):
         batch_size, seq_len = x.shape[:2]
 
@@ -439,6 +435,3 @@ class VqVaeModule(pl.LightningModule):
         window_mask[:, 0] = 1
 
         return window_mask.unsqueeze(0).repeat(batch_size, 1, 1)
-
-
-

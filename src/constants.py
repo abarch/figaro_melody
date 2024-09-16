@@ -42,7 +42,7 @@ TEMPO_KEY = 'Tempo'
 CHORD_KEY = 'Chord'
 MELODY_INSTRUMENT_KEY = 'Melody Instrument'
 MELODY_NOTE_KEY = 'Melody Note'
-NOTE_TYPE_KEY = 'Note Type'
+# NOTE_TYPE_KEY = 'Note Type'
 
 NOTE_DENSITY_KEY = 'Note Density'
 MEAN_PITCH_KEY = 'Mean Pitch'

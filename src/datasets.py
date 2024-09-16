@@ -12,8 +12,7 @@ from vocab import RemiVocab, DescriptionVocab
 from constants import (
   PAD_TOKEN, BOS_TOKEN, EOS_TOKEN, BAR_KEY, POSITION_KEY,
   TIME_SIGNATURE_KEY, INSTRUMENT_KEY, CHORD_KEY,
-  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY,
-  MELODY_NOTE_KEY, MELODY_INSTRUMENT_KEY, NOTE_TYPE_KEY
+  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY, MELODY_NOTE_KEY, MELODY_INSTRUMENT_KEY
 )
 
 
@@ -45,8 +44,9 @@ class MidiDataModule(pl.LightningDataModule):
     if self.description_flavor in ['latent', 'both']:
       assert self.vae_module is not None, "Description flavor 'latent' requires 'vae_module' to be present, but found 'None'"
 
-    self.separated_melody_present = False if description_options is None else description_options['separated_melody']
-    self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
+    # self.separated_melody_present = False if description_options is None else description_options['separated_melody']
+    # self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
+    self.vocab = RemiVocab()
 
     self.kwargs = kwargs
 
@@ -216,6 +216,7 @@ class MidiDataset(IterableDataset):
     self.use_cache = use_cache
     self.print_errors = print_errors
 
+    self.vocab = RemiVocab()
 
     self.description_flavor = description_flavor
     if self.description_flavor in ['latent', 'both']:
@@ -227,7 +228,7 @@ class MidiDataset(IterableDataset):
 
     self.separated_melody_present = False if description_options is None else description_options['separated_melody']
     self.desc_vocab = DescriptionVocab(add_melody_tokens=self.separated_melody_present)
-    self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
+    # self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
 
     self.bar_token_mask = bar_token_mask
     self.bar_token_idx = bar_token_idx
@@ -429,6 +430,9 @@ class MidiDataset(IterableDataset):
 
   def load_file(self, file):
     name = os.path.basename(file)
+    if self.separated_melody_present:
+      name = name.replace('_accompaniment.mid', '.mid')
+    print(f'+++ Processing {file} +++')
     if self.cache_path and self.use_cache:
       cache_file = os.path.join(self.cache_path, name)
     else:
@@ -442,7 +446,6 @@ class MidiDataset(IterableDataset):
       try:
         if self.separated_melody_present:  # Needs to hold for every file if True!
           # if the predominant melody is separated, load the appropriate file as well
-          melody_file = None
           # if file ends with _accompaniment, add its melody as second file
           if file.endswith('_accompaniment.mid'):
             melody_file = file.replace('_accompaniment.mid', '_melody.mid')
@@ -451,12 +454,14 @@ class MidiDataset(IterableDataset):
             melody_file = file
             file = file.replace('_melody.mid', '_accompaniment.mid')
           else:
-            raise ValueError('Unkown file found! File name has to end with _melody.mid or _accompaniment.mid when model is figaro-melody', name)
+            raise ValueError('Unkown file found! File name has to end with _melody.mid or _accompaniment.mid when model is figaro-melody', file)
           rep = InputRepresentation(file, strict=True, melody_file=melody_file)
         else:
           rep = InputRepresentation(file, strict=True)
 
-        events = rep.get_remi_events()
+        # returns events of whole song and events of accompaniment if separated_melody_present
+        # else events_accomp is []
+        events, events_accomp = rep.get_remi_events()
         description = rep.get_description()
       except Exception as err:
         # Or if melody file is not found
@@ -464,6 +469,7 @@ class MidiDataset(IterableDataset):
 
       sample = {
         'events': events,
+        'events_accomp': events_accomp,
         'description': description
       }
 
@@ -477,7 +483,7 @@ class MidiDataset(IterableDataset):
     if self.description_flavor in ['latent', 'both']:
       if self.separated_melody_present:
         # If melody and accompaniment are separated, add only accompaniment notes into latents
-        latent_events = [e for e in sample['events'] if e == f'{NOTE_TYPE_KEY}_A']
+        latent_events = sample['events_accomp']
       else:
         latent_events = sample['events']
       latents, codes = self.get_latent_representation(latent_events, name)

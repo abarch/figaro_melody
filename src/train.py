@@ -192,8 +192,9 @@ def main():
         warmup_steps=WARMUP_STEPS,
         max_steps=MAX_STEPS,
         d_model=D_MODEL,
-        d_latent=D_LATENT,
-        separated_melody_present=True
+        d_latent=D_LATENT
+        # ,
+        # separated_melody_present=True
       ),
       'figaro-learned': lambda: Seq2SeqModule(
         description_flavor='latent',
