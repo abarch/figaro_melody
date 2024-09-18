@@ -136,13 +136,24 @@ class Seq2SeqModule(pl.LightningModule):
       latent = z['latents']
       desc_emb = self.desc_in(desc)
       latent_emb = self.latent_in(latent)
-      
+
+      if desc_emb.shape[1] < latent_emb.shape[1] and desc_bar_ids is not None:
+        diff = latent_emb.shape[1] - desc_emb.shape[1]
+        # print(f'CORRECTION! demb < lemb. Called correction with diff = {diff}')
+        desc_emb = torch.nn.functional.pad(input=desc_emb, pad=(0, 0, diff, 0))
+
+        new_desc_ids = torch.cat((desc_bar_ids, torch.zeros(desc_emb.shape[0], diff, dtype=torch.int64, device=desc_bar_ids.device)), dim=-1)
+        # print('Done')
+      else:
+        new_desc_ids = desc_bar_ids
+
+
       padded = pad_sequence([desc_emb.transpose(0, 1), latent_emb.transpose(0, 1)], batch_first=True)
       desc_emb, latent_emb = padded.transpose(1, 2)
 
-      if desc_bar_ids is not None:
+      if new_desc_ids is not None:
         # Use the fact that description is always longer than latents
-        desc_emb = desc_emb + self.bar_embedding(desc_bar_ids)
+        desc_emb = desc_emb + self.bar_embedding(new_desc_ids)
 
       z_emb = self.desc_proj(torch.cat([desc_emb, latent_emb], dim=-1))
 
@@ -254,7 +265,7 @@ class Seq2SeqModule(pl.LightningModule):
     loss = self.get_loss(batch)
     self.log('train_loss', loss.detach(), on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
     return loss
-  
+
   def validation_step(self, batch, batch_idx):
     loss, logits = self.get_loss(batch, return_logits=True)
     self.log('valid_loss', loss.detach(), on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)

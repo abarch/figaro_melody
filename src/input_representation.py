@@ -508,13 +508,16 @@ class InputRepresentation():
           value='{}'.format(index),
           text='{}/{}'.format(index+1, positions_per_bar))
 
-        if item.name in ['Note', 'Melody']:
+        if item.name == 'Note':
           _append_event_as_string(pos_event)
           note_event_strings = [f'{e.name}_{e.value}' for e in self._process_note_item_to_events(item)]
           events[0].extend(note_event_strings)
-          # Only save accompaniment notes into second list in case the melody is separated
-          if self.separated_melody and item.name == 'Note':
-            events[1].extend(note_event_strings)
+          events[1].extend(note_event_strings)
+        elif item.name == 'Melody':
+          events[0].append(f'{pos_event.name}_{pos_event.value}')
+          note_event_strings = [f'{e.name}_{e.value}' for e in self._process_note_item_to_events(item)]
+          # Only save melody notes to first list
+          events[0].extend(note_event_strings)
         elif item.name == 'Chord':
           if current_chord is None or item.pitch != current_chord.pitch:
             _append_event_as_string(pos_event)
