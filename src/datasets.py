@@ -28,7 +28,6 @@ class MidiDataModule(pl.LightningDataModule):
                pin_memory=True, 
                description_flavor='none',
                train_val_test_split=(0.95, 0.1, 0.05),
-               description_options=None,
                vae_module=None,
                **kwargs):
     super().__init__()
@@ -44,8 +43,6 @@ class MidiDataModule(pl.LightningDataModule):
     if self.description_flavor in ['latent', 'both']:
       assert self.vae_module is not None, "Description flavor 'latent' requires 'vae_module' to be present, but found 'None'"
 
-    # self.separated_melody_present = False if description_options is None else description_options['separated_melody']
-    # self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
     self.vocab = RemiVocab()
 
     self.kwargs = kwargs
@@ -205,7 +202,8 @@ class MidiDataset(IterableDataset):
                bar_token_mask=None,
                bar_token_idx=2,
                use_cache=True,
-               print_errors=False):
+               print_errors=False,
+               do_train_vae_accomp=False):
     self.files = midi_files
     self.group_bars = group_bars
     self.max_len = max_len
@@ -229,6 +227,8 @@ class MidiDataset(IterableDataset):
     self.separated_melody_present = False if description_options is None else description_options['separated_melody']
     self.desc_vocab = DescriptionVocab(add_melody_tokens=self.separated_melody_present)
     # self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
+
+    self.do_train_vae_accomp = do_train_vae_accomp
 
     self.bar_token_mask = bar_token_mask
     self.bar_token_idx = bar_token_idx
@@ -264,7 +264,7 @@ class MidiDataset(IterableDataset):
         # Skips faulty files
         continue
 
-      events = current_file['events']
+      events = current_file['events_accomp'] if self.do_train_vae_accomp else current_file['events']
 
       # Identify start of bars
       bars, bar_ids = self.get_bars(events, include_ids=True)
@@ -430,7 +430,7 @@ class MidiDataset(IterableDataset):
 
   def load_file(self, file):
     name = os.path.basename(file)
-    if self.separated_melody_present:
+    if self.separated_melody_present or self.do_train_vae_accomp:
       name = name.replace('_accompaniment.mid', '.mid')
     print(f'+++ Processing {file} +++')
     if self.cache_path and self.use_cache:
@@ -444,7 +444,8 @@ class MidiDataset(IterableDataset):
     except Exception:
       # If there's no cached version, compute the representations
       try:
-        if self.separated_melody_present:  # Needs to hold for every file if True!
+        # Also done for self.do_train_vae_accomp because its accompaniment's metadata needs to be adjusted to fit the melody
+        if self.separated_melody_present or self.do_train_vae_accomp:  # Needs to hold for every file if True!
           # if the predominant melody is separated, load the appropriate file as well
           # if file ends with _accompaniment, add its melody as second file
           if file.endswith('_accompaniment.mid'):

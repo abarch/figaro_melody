@@ -159,6 +159,7 @@ class VqVaeModule(pl.LightningModule):
                  windowed_attention_pr=0.0,
                  max_lookahead=4,
                  disable_vq=False,
+                 do_train_vae_accomp=False,
                  separated_melody_present=False):  # DNOTE Ohne Note Type egal
         super().__init__()
 
@@ -181,6 +182,8 @@ class VqVaeModule(pl.LightningModule):
 
         # self.vocab = RemiVocab(add_melody_tokens=separated_melody_present)
         self.vocab = RemiVocab()
+
+        self.do_train_vae_accomp = do_train_vae_accomp
 
         self.pad_token = self.vocab.to_i(PAD_TOKEN)
         self.bos_token = self.vocab.to_i(BOS_TOKEN)
@@ -232,6 +235,7 @@ class VqVaeModule(pl.LightningModule):
             self.context_size, 
             max_bars_per_context=1, 
             bar_token_mask=MASK_TOKEN,
+            do_train_vae_accomp=self.do_train_vae_accomp,
             **kwargs
         )
 

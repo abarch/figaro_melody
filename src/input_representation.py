@@ -79,14 +79,21 @@ class InputRepresentation():
   def version():
     return 'v4'
 
-   # Utility to combine lists of accompaniment and melody properties
-  def _merge_lists(self, accompaniment:np.ndarray, melody:np.ndarray):
+  # Utility to combine lists of accompaniment and melody properties
+  # Preserves order and ensures that values are unique
+  def _merge_lists(self, accompaniment, melody):
     ret_list = np.concatenate((melody, accompaniment))
+    ret_list = np.unique(ret_list)
     ret_list.sort()
-    # return list(dict.fromkeys(ret_list))
-    return np.unique(ret_list)
+    return ret_list
+  def _merge_arrays(self, accompaniment, melody):
+    ret_list = np.concatenate((melody, accompaniment), axis=0)
+    ret_list = np.unique(ret_list, axis=0)
+    ret_sorted_unique = ret_list[np.argsort(ret_list[:, 0])]
+    return ret_sorted_unique
 
-  def __init__(self, file, do_extract_chords=True, strict=False, melody_file=None):
+
+  def __init__(self, file, do_extract_chords=False, strict=False, melody_file=None):
     # If melody_file is given item type 'Note' represents the accompaniment (non-melody) notes of the song
     # file and melody_file are obtained from the same song via preprocessing with extract_predominant_melody.py
     if melody_file is not None:
@@ -110,7 +117,10 @@ class InputRepresentation():
     if self.separated_melody and strict and len(self.pm_mel.time_signature_changes) == 0:
       raise ValueError("Invalid MIDI Melody file: No time signature defined")
 
-    self.resolution = self.pm.resolution
+    if self.separated_melody:
+      self.resolution = max(self.pm.resolution, self.pm_mel.resolution)
+    else:
+      self.resolution = self.pm.resolution
 
     self.note_items = None
     self.tempo_items = None
@@ -193,7 +203,7 @@ class InputRepresentation():
     # tempo
     self.tempo_items = []
     if self.separated_melody:
-      times, tempi = self._merge_lists(self.pm.get_tempo_changes(), self.pm_mel.get_tempo_changes())
+      times, tempi = self._merge_arrays(self.pm.get_tempo_changes(), self.pm_mel.get_tempo_changes())
     else:
       times, tempi = self.pm.get_tempo_changes()
     for time, tempo in zip(times, tempi):
@@ -254,6 +264,11 @@ class InputRepresentation():
       return self.chords
     method = MIDIChord(self.pm)  # TODO merge with melody
     chords = method.extract()
+    # Untested
+    if self.separated_melody:
+      mel_method = MIDIChord(self.pm_mel)
+      mel_chords = mel_method.extract()
+      chords = self._merge_lists(chords, mel_chords)
     output = []
     for chord in chords:
       output.append(Item(
@@ -290,7 +305,7 @@ class InputRepresentation():
           'Chord': 0,
           'Tempo': 1,
           'Melody': 2,
-          'Note': 3
+          'Note': 2
         }
       else:
         type_priority = {
@@ -498,7 +513,7 @@ class InputRepresentation():
           note_event_strings = [f'{e.name}_{e.value}' for e in self._process_note_item_to_events(item)]
           events[0].extend(note_event_strings)
           # Only save accompaniment notes into second list in case the melody is separated
-          if self.separated_melody and item.name == 'Notes':
+          if self.separated_melody and item.name == 'Note':
             events[1].extend(note_event_strings)
         elif item.name == 'Chord':
           if current_chord is None or item.pitch != current_chord.pitch:

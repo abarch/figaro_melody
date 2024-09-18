@@ -114,11 +114,11 @@ def main():
   MAX_CONTEXT = min(1024, CONTEXT_SIZE)
 
   if MODEL in ['figaro-learned', 'figaro', 'figaro-melody'] and VAE_CHECKPOINT:
-    # vae_module = VqVaeModule.load_from_checkpoint(checkpoint_path=VAE_CHECKPOINT)
-    # vae_module.cpu()
-    # vae_module.freeze()
-    # vae_module.eval()
-    vae_module = load_old_or_new_checkpoint(VqVaeModule, VAE_CHECKPOINT)
+    vae_module = VqVaeModule.load_from_checkpoint(checkpoint_path=VAE_CHECKPOINT)
+    vae_module.cpu()
+    vae_module.freeze()
+    vae_module.eval()
+    #vae_module = load_old_or_new_checkpoint(VqVaeModule, VAE_CHECKPOINT)
 
   else:
     vae_module = None
@@ -144,8 +144,8 @@ def main():
       'figaro-no-meta': Seq2SeqModule,
       'baseline': Seq2SeqModule,
     }[MODEL]
-    model = load_old_or_new_checkpoint(model_class=model_class, checkpoint=CHECKPOINT)
-    # model = model_class.load_from_checkpoint(checkpoint_path=CHECKPOINT)
+    # model = load_old_or_new_checkpoint(model_class=model_class, checkpoint=CHECKPOINT)
+    model = model_class.load_from_checkpoint(checkpoint_path=CHECKPOINT)
 
   else:
     seq2seq_kwargs = {
@@ -192,7 +192,8 @@ def main():
         warmup_steps=WARMUP_STEPS,
         max_steps=MAX_STEPS,
         d_model=D_MODEL,
-        d_latent=D_LATENT
+        d_latent=D_LATENT,
+        do_train_vae_accomp=True
         # ,
         # separated_melody_present=True
       ),

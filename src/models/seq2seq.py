@@ -121,7 +121,7 @@ class Seq2SeqModule(pl.LightningModule):
 
   def get_datamodule(self, midi_files, **kwargs):
     return MidiDataModule(
-      midi_files, 
+      midi_files,
       self.context_size,
       description_flavor=self.description_flavor,
       max_bars=self.max_bars,
