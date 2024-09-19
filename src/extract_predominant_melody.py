@@ -94,6 +94,12 @@ def extract_from_midi_to_midi(file_path, output):
                 mel_note_block_found = True
                 # Set velocity of melody note according to the matching non-melody note
                 m_note.velocity = o_note.velocity
+
+                # Experiment (note yet launched)
+                m_note.start, m_note.end = o_note.start, o_note.end
+                m_note.pitch = o_note.pitch
+                # NOTE Es könnte hierbei passieren, dass mehrere Melodie-Noten übereinander fallen (oder?)
+
                 # Add melody note to fitting instrument
                 new_mel_instrument.notes.append(m_note)
                 mel_instrument_set = True
