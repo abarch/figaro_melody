@@ -18,34 +18,29 @@ SAMPLE_RATE = 44100.0
 
 
 def extract_from_midi_to_midi(file_path, output):
+  """
+  Extracts the melody of a midi file. Stores the melody and accompaniment as separate files
+  :param file_path: Input midi file
+  :param output: The base path to store the files in
+  :return: None
+  """
+
   try:
     pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
   except (OSError, EOFError, ValueError, KeyError, mido.midifiles.meta.KeySignatureError) as err:
     print(f'ERROR Corrupt midi file {file_path}. Skipping it.')
     print('Cause of corruption:', str(err))
   else:
-    # synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
-    synth = pm_original.synthesize().astype(np.float32)
-    eqloud = es.EqualLoudness()  # recommended as preprocessing for melody extraction
-    audio_data = eqloud(synth)
-
-    melody_extractor = es.PredominantPitchMelodia(guessUnvoiced=True)
-    pitch_values, pitch_confidence = melody_extractor(audio_data)
-
-    # Pitch values to pm
-    onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
-
+    # # Productive
+    melody_notes = compute_melody_notes(pm_original)
     pm_melody = deepcopy(pm_original)
-    melody_notes = []
-    for pitch, onset, duration in zip(notes, onsets, durations):
-      # NOTE velocity = -1 is a default value and is changed later. Otherwise -1 is an invalid velocity value
-      note = pretty_midi.Note(velocity=-1, pitch=int(pitch), start=onset, end=onset + duration)
-      melody_notes.append(note)
+
+    # Testing
+    # pm_melody = pretty_midi.PrettyMIDI('input_melody.mid')
+    # melody_notes = []
 
     # Compute accompaniment
     pm_melody.instruments.clear()  # Will be recalculated below
-
-    # pm_accomp = deepcopy(pm_original)
 
     time_thresh_start = 1
     time_thresh_end = 1
@@ -56,6 +51,12 @@ def extract_from_midi_to_midi(file_path, output):
 
     # Elements to be deleted from o_notes (= melody notes in original notes)
     def _filter_condition(melody_note, orig_note):
+      """
+      Checks whether melody and original note are close to each other in terms of times and pitch
+      :param melody_note: Melody note
+      :param orig_note: Original note
+      :return: True if close, False if not
+      """
       return abs(melody_note.pitch - orig_note.pitch) <= pitch_thresh and \
              abs(melody_note.start - orig_note.start) <= time_thresh_start and \
              abs(melody_note.end - orig_note.end) <= time_thresh_end
@@ -95,7 +96,6 @@ def extract_from_midi_to_midi(file_path, output):
                 # Set velocity of melody note according to the matching non-melody note
                 m_note.velocity = o_note.velocity
 
-                # Experiment (note yet launched)
                 m_note.start, m_note.end = o_note.start, o_note.end
                 m_note.pitch = o_note.pitch
                 # NOTE Es könnte hierbei passieren, dass mehrere Melodie-Noten übereinander fallen (oder?)
@@ -120,6 +120,7 @@ def extract_from_midi_to_midi(file_path, output):
 
         # Add the melody notes with the fitting instrument again
         if len(new_mel_instrument.notes) > 0:
+          pm_melody.remove_invalid_notes()  # optional
           pm_melody.instruments.append(new_mel_instrument)
 
         instr.notes = np.delete(np.array(instr.notes), o_notes_to_delete)
@@ -147,45 +148,29 @@ def extract_from_midi_to_midi(file_path, output):
     print('Accompaniment result written to', out_path_accomp)
 
 
-def extract_from_mp3_to_midi(file_path, output):
-  print('Processing', file_path)
+def compute_melody_notes(pm_original):
+  """
+  Uses MELODIA and pitch contour segmentation to compute the midi notes from pretty_midi object
+  :param pm_original: The midi object
+  :return: midi melody notes
+  :rtype: list[pretty_midi.Note]
+  """
 
-  # Load audio file
-  loader = es.EqloudLoader(filename=file_path, sampleRate=SAMPLE_RATE)
-  audio_data = loader()
-  # print("Duration of the audio sample [sec]:")
-  # print(len(audio)/SAMPLE_RATE)
-
-  # Extract melody as pitch values
+  # synth = pm_original.fluidsynth().astype(np.float32)  # float32 is essentia's internal datatype; fluidsynth would output float64
+  synth = pm_original.synthesize().astype(np.float32)
+  eqloud = es.EqualLoudness()  # recommended as preprocessing for melody extraction
+  audio_data = eqloud(synth)
   melody_extractor = es.PredominantPitchMelodia(guessUnvoiced=True)
   pitch_values, pitch_confidence = melody_extractor(audio_data)
 
-  export_to_midi(audio_data, file_path, pitch_values, output)
-
-  # ######################################################################
-  # ##### Export as raw audio
-  # # Pitch is estimated on frames. Compute frame time positions.
-  # pitch_times = np.linspace(0.0,len(audio)/SAMPLE_RATE,len(pitch_values) )
-  # synthesized_melody = pitch_contour(pitch_times, pitch_values, SAMPLE_RATE).astype(np.float32)[:len(audio)]
-  # es.AudioWriter(filename='extraction_examples/essentia_melodia/' + base_name + '.mp3', format='mp3')(es.StereoMuxer()(audio, synthesized_melody))
-  # ######################################################################
-
-def export_to_midi(audio_data, file_path, pitch_values, output):
+  # Pitch values to pm
   onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
-  # print("MIDI notes:", notes) # Midi pitch number
-  # print("MIDI note onsets:", onsets)
-  # print("MIDI note durations:", durations)
-  instrument = pretty_midi.Instrument(program=0)  # = 'Acoustic Grand Piano'
-  pm_melody = pretty_midi.PrettyMIDI()
+  melody_notes = []
   for pitch, onset, duration in zip(notes, onsets, durations):
-    # Old! Has to be adjusted as in extract_from_midi_to_midi
-    note = pretty_midi.Note(velocity=100, pitch=int(pitch), start=onset, end=onset + duration)
-    instrument.notes.append(note)
-  pm_melody.instruments.append(instrument)
-
-  out_path = os.path.join(output, f'{Path(file_path).stem}_melody.mid')
-  pm_melody.write(out_path)
-  print('Result written to', out_path)
+    # NOTE velocity = -1 is a default value and is changed later. Otherwise -1 is an invalid velocity value
+    note = pretty_midi.Note(velocity=-1, pitch=int(pitch), start=onset, end=onset + duration)
+    melody_notes.append(note)
+  return melody_notes
 
 
 def process_folder(folder, output):
@@ -220,8 +205,8 @@ def main():
   # Convert RuntimeWarnings to errors so the can be caught in process_folder
   warnings.simplefilter(action='error', category=RuntimeWarning)
   parser = argparse.ArgumentParser()
-  parser.add_argument('--input', type=str, default='./lmd_full')
-  parser.add_argument('--output', type=str, default='./preprocessed')
+  parser.add_argument('--input', type=str, required=True)
+  parser.add_argument('--output', type=str, required=True)
   args = parser.parse_args()
 
   start_time = time.time()
