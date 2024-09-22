@@ -86,6 +86,7 @@ class InputRepresentation():
     ret_list = np.unique(ret_list)
     ret_list.sort()
     return ret_list
+
   def _merge_arrays(self, accompaniment, melody):
     ret_list = np.concatenate((melody, accompaniment), axis=0)
     ret_list = np.unique(ret_list, axis=0)
@@ -93,7 +94,7 @@ class InputRepresentation():
     return ret_sorted_unique
 
 
-  def __init__(self, file, do_extract_chords=False, strict=False, melody_file=None):
+  def __init__(self, file, do_extract_chords=True, strict=False, melody_file=None):
     # If melody_file is given item type 'Note' represents the accompaniment (non-melody) notes of the song
     # file and melody_file are obtained from the same song via preprocessing with extract_predominant_melody.py
     if melody_file is not None:
@@ -118,6 +119,7 @@ class InputRepresentation():
       raise ValueError("Invalid MIDI Melody file: No time signature defined")
 
     if self.separated_melody:
+      # Choose the higher resolution. (Higher resolution = more detailed timing)
       self.resolution = max(self.pm.resolution, self.pm_mel.resolution)
     else:
       self.resolution = self.pm.resolution
@@ -262,13 +264,17 @@ class InputRepresentation():
       # If sequence is shorter than 1/4th note, it's probably empty
       self.chords = []
       return self.chords
-    method = MIDIChord(self.pm)  # TODO merge with melody
+    method = MIDIChord(self.pm)
     chords = method.extract()
     # Untested
     if self.separated_melody:
       mel_method = MIDIChord(self.pm_mel)
       mel_chords = mel_method.extract()
-      chords = self._merge_lists(chords, mel_chords)
+      # Merge chords of melody and accompaniment
+      chords.extend(mel_chords)
+      chords.sort(key=lambda c: c.start)
+      chords = mel_method.dedupe(chords)
+
     output = []
     for chord in chords:
       output.append(Item(

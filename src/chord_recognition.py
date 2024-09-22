@@ -197,7 +197,7 @@ class MIDIChord(object):
       return []
     deduped = []
     start, end, chord = chords[0]
-    for (curr, next) in zip(chords[:-1], chords[1:]):
+    for (curr, next) in zip(chords[:-1], chords[1:]):  # curr and next are adjacent
       if chord == next[2]:
         end = next[1]
       else:
@@ -228,11 +228,11 @@ class MIDIChord(object):
 
   def extract(self):
     # read
-    beats = self.pm.get_beats()  # TODO merge with melody
-    chroma = self.pm.get_chroma(times=beats)  # TODO merge with melody
+    beats = self.pm.get_beats()
+    chroma = self.pm.get_chroma(times=beats)
     # get lots of candidates
     candidates = self.get_candidates(chroma, max_tick=len(beats))
-    
+
     # greedy
     chords = self.dynamic(candidates=candidates, 
                           max_tick=len(beats), 
@@ -241,7 +241,7 @@ class MIDIChord(object):
     for chord in chords:
       chord[0] = beats[chord[0]]
       if chord[1] >= len(beats):
-        chord[1] = self.pm.get_end_time()  # TODO merge with melody
+        chord[1] = self.pm.get_end_time()
       else:
         chord[1] = beats[chord[1]]
     return chords
