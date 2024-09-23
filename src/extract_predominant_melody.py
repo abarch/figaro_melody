@@ -16,6 +16,19 @@ from copy import deepcopy
 
 SAMPLE_RATE = 44100.0
 
+def test_synthesis(file_path):
+  pm = pretty_midi.PrettyMIDI(file_path)
+
+  # Loudness equalization
+  eqloud = es.EqualLoudness()
+
+  synthed_synthesize = pm.synthesize().astype(np.float32)
+  writer = es.MonoWriter(filename='temp/synthtest/eq_synthesize.wav', sampleRate=SAMPLE_RATE, format='wav')
+  writer(eqloud(synthed_synthesize))
+
+  synthed_fluidsynth = pm.fluidsynth().astype(np.float32)
+  writer = es.MonoWriter(filename='temp/synthtest/eq_fluidsynth.wav', sampleRate=SAMPLE_RATE, format='wav')
+  writer(eqloud(synthed_fluidsynth))
 
 def extract_from_midi_to_midi(file_path, output):
   """
@@ -27,24 +40,28 @@ def extract_from_midi_to_midi(file_path, output):
 
   try:
     pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
+    pm_original.remove_invalid_notes()
   except (OSError, EOFError, ValueError, KeyError, mido.midifiles.meta.KeySignatureError) as err:
     print(f'ERROR Corrupt midi file {file_path}. Skipping it.')
     print('Cause of corruption:', str(err))
   else:
-    # # Productive
+    # Productive
     melody_notes = compute_melody_notes(pm_original)
+    # Copies all time_signature changes, etc. from the original midi file
     pm_melody = deepcopy(pm_original)
 
     # Testing
     # pm_melody = pretty_midi.PrettyMIDI('input_melody.mid')
     # melody_notes = []
+    # for instr in pm_melody.instruments:  # Flatten as single Instrument. # NOTE Can lead to duplicate notes(!)
+    #   melody_notes.extend(instr.notes)
 
     # Compute accompaniment
     pm_melody.instruments.clear()  # Will be recalculated below
 
-    time_thresh_start = 1
-    time_thresh_end = 1
-    pitch_thresh = 4
+    time_thresh_start = 2
+    time_thresh_end = 2
+    pitch_thresh = 3  # can (and should) stay small because values are quantized!
 
     processed_orig_notes = 0
     removed_notes = 0
@@ -61,13 +78,17 @@ def extract_from_midi_to_midi(file_path, output):
              abs(melody_note.start - orig_note.start) <= time_thresh_start and \
              abs(melody_note.end - orig_note.end) <= time_thresh_end
 
+    # Debugging:
+    # Tracks how many melody notes have been assigned to an original note with bools for each idx
+    m_n_assigned = np.zeros(len(melody_notes), dtype=bool)
+    #------------------------------------------------------
     for instr in pm_original.instruments:
       if not instr.is_drum:
         # Debugging
         processed_orig_notes += len(instr.notes)
         # --------------------------------------
 
-        o_notes_to_delete = []
+        o_notes_to_delete = set([])
 
         new_mel_instrument = pretty_midi.Instrument(name=instr.name, program=instr.program)
         new_mel_instrument.control_changes = instr.control_changes
@@ -80,12 +101,19 @@ def extract_from_midi_to_midi(file_path, output):
           mel_instrument_set = False
           mel_note_block_found = False
           # o_note is the original note of the instrument
-          for o_note_idx, o_note in enumerate(instr.notes[found_mel_note_idx:], start=found_mel_note_idx):
+          for o_note_idx, o_note in enumerate(instr.notes[:]):
+          # for o_note_idx, o_note in enumerate(instr.notes[found_mel_note_idx:], start=found_mel_note_idx):
             # m_note and o_note are close
             if _filter_condition(melody_note=m_note, orig_note=o_note):
               # Collect indices of o_notes that are found in the melody notes
-              o_notes_to_delete.append(o_note_idx)
+              o_notes_to_delete.add(o_note_idx)  # wrap in if last element != o_note_idx
+              m_n_assigned[m_note_idx] = True
+              # Debug: List of actual differences:
+              # pitch_diff = abs(m_note.pitch - o_note.pitch)
+              # start_diff = abs(m_note.start - o_note.start)
+              # end_diff = abs(m_note.end - o_note.end)
 
+              # print(f'pitch_diff: {pitch_diff} start_diff: {start_diff} end_diff: {end_diff}')
               # Only set each melody instrument once for each m_note
               if not mel_instrument_set:
                 # Remember the current o_note_idx to reduce iterations for next m_note
@@ -98,7 +126,6 @@ def extract_from_midi_to_midi(file_path, output):
 
                 m_note.start, m_note.end = o_note.start, o_note.end
                 m_note.pitch = o_note.pitch
-                # NOTE Es könnte hierbei passieren, dass mehrere Melodie-Noten übereinander fallen (oder?)
 
                 # Add melody note to fitting instrument
                 new_mel_instrument.notes.append(m_note)
@@ -123,7 +150,7 @@ def extract_from_midi_to_midi(file_path, output):
           pm_melody.remove_invalid_notes()  # optional
           pm_melody.instruments.append(new_mel_instrument)
 
-        instr.notes = np.delete(np.array(instr.notes), o_notes_to_delete)
+        instr.notes = np.delete(np.array(instr.notes), list(o_notes_to_delete))
 
         # Debug
         removed_notes += len(o_notes_to_delete)
@@ -131,6 +158,8 @@ def extract_from_midi_to_midi(file_path, output):
     # Debug output
     print('Processed notes', processed_orig_notes)
     print('Removed notes', removed_notes)
+
+    print('Unassigned m_notes:', len(np.argwhere(m_n_assigned == False)))
 
     # With clean_midi (lmd) as input:
     p = Path(file_path)
@@ -161,14 +190,16 @@ def compute_melody_notes(pm_original):
   eqloud = es.EqualLoudness()  # recommended as preprocessing for melody extraction
   audio_data = eqloud(synth)
   melody_extractor = es.PredominantPitchMelodia(guessUnvoiced=True)
-  pitch_values, pitch_confidence = melody_extractor(audio_data)
+  pitch_values, pitch_confidence = melody_extractor(audio_data)  # pitch values from unvoiced segments are negative
 
+  # Note that PitchContourSegmentation already returns the quantized midi note numbers, not the physical pitches
+  # returns onset times in seconds, already quantized to the equal tempered scale
   # Pitch values to pm
-  onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(pitch_values, audio_data)
+  onsets, durations, notes = es.PitchContourSegmentation(hopSize=128)(list(np.absolute(pitch_values)), audio_data)
   melody_notes = []
   for pitch, onset, duration in zip(notes, onsets, durations):
-    # NOTE velocity = -1 is a default value and is changed later. Otherwise -1 is an invalid velocity value
-    note = pretty_midi.Note(velocity=-1, pitch=int(pitch), start=onset, end=onset + duration)
+    # NOTE velocity = -1 is a default value in this context and is changed later. Otherwise -1 is an invalid velocity value
+    note = pretty_midi.Note(velocity=-1, pitch=round(pitch), start=onset, end=onset + duration)
     melody_notes.append(note)
   return melody_notes
 
