@@ -272,7 +272,7 @@ class InputRepresentation():
       mel_chords = mel_method.extract()
       # Merge chords of melody and accompaniment
       chords.extend(mel_chords)
-      chords.sort(key=lambda c: c.start)
+      chords.sort(key=lambda c: c[0])
       chords = mel_method.dedupe(chords)
 
     output = []
