@@ -423,6 +423,7 @@ class MidiDataset(IterableDataset):
       MEAN_PITCH_KEY: meta,
       MEAN_VELOCITY_KEY: meta,
       MEAN_DURATION_KEY: meta,
+      # TODO Melody Token Update
       MELODY_INSTRUMENT_KEY: separated_melody,
       MELODY_NOTE_KEY: separated_melody
     }

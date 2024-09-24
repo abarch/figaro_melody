@@ -98,16 +98,28 @@ class Tokens:
       position_tokens
     )
 
+  # NOTE Mit der Variante sinds 1451 Token insgesamt (ohne Melodietoken 960)
   def get_melody_tokens(melody_note_key=MELODY_NOTE_KEY, melody_instrument_key=MELODY_INSTRUMENT_KEY):
     # Shape: Melody Instrument_(instrument)
     instrument_tokens = Tokens.get_instrument_tokens(key=melody_instrument_key, with_drum=False)
 
+    pitch_tokens = [f'{PITCH_KEY}_{i}' for i in range(128)]
+    velocity_tokens = [f'{VELOCITY_KEY}_{i}' for i in range(len(DEFAULT_VELOCITY_BINS))]
+    duration_tokens = [f'{VELOCITY_KEY}_{i}' for i in range(len(DEFAULT_DURATION_BINS))]
+    position_tokens = [f'{POSITION_KEY}_{i}' for i in range(MAX_BAR_LENGTH * 4 * DEFAULT_POS_PER_QUARTER)]
+
     # Shape: Melody Note_(pitch);(velocity);(duration)
-    pitch_values = list(range(128))
-    velocity_values = DEFAULT_VELOCITY_BINS
-    duration_values = DEFAULT_DURATION_BINS
-    note_tokens = [f'{melody_note_key}_{p};{v};{d}' for p in pitch_values for v in velocity_values for d in duration_values]
-    return instrument_tokens + note_tokens
+    # pitch_values = list(range(128))
+    # velocity_values = DEFAULT_VELOCITY_BINS
+    # duration_values = DEFAULT_DURATION_BINS
+    # note_tokens = [f'{melody_note_key}_{p};{v};{d}' for p in pitch_values for v in velocity_values for d in duration_values]
+
+    return (instrument_tokens  # + note_tokens
+            + pitch_tokens
+            + velocity_tokens
+            + duration_tokens
+            + position_tokens)
+
 
 class Vocab:
   def __init__(self, counter, specials=[PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN, MASK_TOKEN], unk_token=UNK_TOKEN):

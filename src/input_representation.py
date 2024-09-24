@@ -657,6 +657,7 @@ class InputRepresentation():
         mel_instr_events = set([])  # List every instrument name once
         mel_note_events = []
         for mel_note in melody:
+          # TODO Melody Token Update
           mel_instr_events.add(Event(
             name=MELODY_INSTRUMENT_KEY,
             time=None,

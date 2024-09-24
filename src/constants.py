@@ -40,6 +40,7 @@ VELOCITY_KEY = 'Velocity'
 DURATION_KEY = 'Duration'
 TEMPO_KEY = 'Tempo'
 CHORD_KEY = 'Chord'
+# TODO Melody Token Update at locations where these are used
 MELODY_INSTRUMENT_KEY = 'Melody Instrument'
 MELODY_NOTE_KEY = 'Melody Note'
 # NOTE_TYPE_KEY = 'Note Type'
