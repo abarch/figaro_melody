@@ -578,8 +578,8 @@ class InputRepresentation():
           text='{}/{}'.format(time_sig.numerator, time_sig.denominator),
         ))
 
+      notes = [item for item in self.groups[i][1:-1] if item.name in ['Note', 'Melody']]
       if not omit_meta:
-        notes = [item for item in self.groups[i][1:-1] if item.name in ['Note', 'Melody']]
         n_notes = len(notes)
         velocities = np.array([item.velocity for item in notes])
         pitches = np.array([item.pitch for item in notes])
