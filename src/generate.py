@@ -153,7 +153,7 @@ def main():
 
   model, vae_module = load_model(args.checkpoint, args.vae_checkpoint)
 
-  if args.model in ['figaro-melody', 'vq-vae-accomp']:
+  if args.model in ['figaro-melody', 'figaro-melody-no-inst', 'figaro-melody-no-chord', 'vq-vae-accomp']:
     # Only use accompaniment files. Otherwise each tuple will be used twice
     midi_files = glob.glob(os.path.join(args.lmd_dir, '**/*_accompaniment.mid'), recursive=True)
   else:
@@ -169,7 +169,7 @@ def main():
 
 
   description_options = None
-  if args.model in ['figaro-no-inst', 'figaro-no-chord', 'figaro-no-meta', 'figaro-melody', 'vq-vae-accomp']:
+  if args.model in ['figaro-no-inst', 'figaro-no-chord', 'figaro-no-meta', 'figaro-melody', 'figaro-melody-no-inst', 'figaro-melody-no-chord', 'vq-vae-accomp']:
     description_options = model.description_options
 
   dataset = MidiDataset(

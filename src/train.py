@@ -84,6 +84,8 @@ def main():
     'figaro-expert',
     'figaro',
     'figaro-melody',
+    'figaro-melody-no-inst',
+    'figaro-melody-no-chord',
     'figaro-inst',
     'figaro-chord',
     'figaro-meta',
@@ -98,7 +100,7 @@ def main():
 
 
   ### Create data loaders ###
-  if MODEL in ['figaro-melody', 'vq-vae-accomp']:
+  if MODEL in ['figaro-melody', 'figaro-melody-no-inst', 'figaro-melody-no-chord', 'vq-vae-accomp']:
     # Only use accompaniment files. Otherwise each pair of melody and accompaniment will be used twice
     midi_files = glob.glob(os.path.join(ROOT_DIR, '**/*_accompaniment.mid'), recursive=True)
   else:
@@ -113,7 +115,7 @@ def main():
 
   MAX_CONTEXT = min(1024, CONTEXT_SIZE)
 
-  if MODEL in ['figaro-learned', 'figaro', 'figaro-melody'] and VAE_CHECKPOINT:
+  if MODEL in ['figaro-learned', 'figaro', 'figaro-melody', 'figaro-melody-no-inst', 'figaro-melody-no-chord'] and VAE_CHECKPOINT:
     vae_module = VqVaeModule.load_from_checkpoint(checkpoint_path=VAE_CHECKPOINT)
     vae_module.cpu()
     vae_module.freeze()
@@ -135,6 +137,8 @@ def main():
       'figaro-learned': Seq2SeqModule,
       'figaro-expert': Seq2SeqModule,
       'figaro-melody': Seq2SeqModule,
+      'figaro-melody-no-inst': Seq2SeqModule,
+      'figaro-melody-no-chord': Seq2SeqModule,
       'figaro': Seq2SeqModule,
       'figaro-inst': Seq2SeqModule,
       'figaro-chord': Seq2SeqModule,
@@ -194,8 +198,6 @@ def main():
         d_model=D_MODEL,
         d_latent=D_LATENT,
         do_train_vae_accomp=True
-        # ,
-        # separated_melody_present=True
       ),
       'figaro-learned': lambda: Seq2SeqModule(
         description_flavor='latent',
@@ -221,6 +223,22 @@ def main():
         n_groups=vae_module.n_groups,
         d_latent=vae_module.d_latent,
         description_options={ 'instruments': True, 'chords': True, 'meta': True, 'separated_melody': True },
+        **seq2seq_kwargs
+      ),
+      'figaro-melody-no-inst': lambda: Seq2SeqModule(
+        description_flavor='both',
+        n_codes=vae_module.n_codes,
+        n_groups=vae_module.n_groups,
+        d_latent=vae_module.d_latent,
+        description_options={ 'instruments': False, 'chords': True, 'meta': True, 'separated_melody': True },
+        **seq2seq_kwargs
+      ),
+      'figaro-melody-no-chord': lambda: Seq2SeqModule(
+        description_flavor='both',
+        n_codes=vae_module.n_codes,
+        n_groups=vae_module.n_groups,
+        d_latent=vae_module.d_latent,
+        description_options={ 'instruments': True, 'chords': False, 'meta': True, 'separated_melody': True },
         **seq2seq_kwargs
       ),
       'figaro-no-meta': lambda: Seq2SeqModule(
