@@ -278,7 +278,7 @@ def main():
     filename='{step}-{valid_loss:.2f}',
     save_last=True,
     save_top_k=2,
-    every_n_train_steps=1000,
+    every_n_train_steps=500,  # = val_check_interval
   )
 
   lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='step')
@@ -293,7 +293,7 @@ def main():
     max_epochs=EPOCHS,
     max_steps=MAX_TRAINING_STEPS,
     log_every_n_steps=max(100, min(25*ACCUMULATE_GRADS, 200)),
-    val_check_interval=max(500, min(300*ACCUMULATE_GRADS, 1000)),
+    val_check_interval=500,  # max(500, min(300*ACCUMULATE_GRADS, 1000)),
     limit_val_batches=64,
     accumulate_grad_batches=ACCUMULATE_GRADS,
     gradient_clip_val=1.0,
