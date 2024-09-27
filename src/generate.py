@@ -151,7 +151,7 @@ def main():
 
   print(f"Saving generated files to: {output_dir}")
 
-  model, vae_module = load_model(args.checkpoint, args.vae_checkpoint)
+  model, vae_module = load_model(args.checkpoint, args.vae_checkpoint, device='cpu')
 
   if args.model in ['figaro-melody', 'figaro-melody-no-inst', 'figaro-melody-no-chord', 'vq-vae-accomp']:
     # Only use accompaniment files. Otherwise each tuple will be used twice
