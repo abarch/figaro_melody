@@ -122,13 +122,12 @@ def reconstruct_sample(model, batch,
   if output_dir:
     os.makedirs(os.path.join(output_dir, 'ground_truth'), exist_ok=True)
     for pm, pm_hat, file in zip(pms, pms_hat, batch['files']):
+      out_name = file.replace('_accompaniment.mid', '.mid')
       if verbose:
-        print(f"Saving to {output_dir}/{file}")
-      pm.write(os.path.join(output_dir, 'ground_truth', file))
-      pm_hat.write(os.path.join(output_dir, file))
-
-  return events
-
+        print(f"Saving to {output_dir}/{out_name}")
+      pm.write(os.path.join(output_dir, 'ground_truth', out_name))
+      pm_hat.write(os.path.join(output_dir, out_name))
+  return events, events_hat
 
 def main():
   args = parse_args()

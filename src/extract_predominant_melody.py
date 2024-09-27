@@ -24,9 +24,6 @@ pcs = es.PitchContourSegmentation(hopSize=128)
 def test_synthesis(file_path, out_path):
   pm = pretty_midi.PrettyMIDI(file_path)
 
-  # Loudness equalization
-  # eqloud = es.EqualLoudness()
-
   synthed_synthesize = pm.synthesize().astype(np.float32)
   writer = es.MonoWriter(filename=f'{out_path}/eq_synthesize.wav', sampleRate=SAMPLE_RATE, format='wav')
   writer(eqloud(synthed_synthesize))
@@ -41,7 +38,7 @@ def extract_from_midi_to_midi(file_path, output, use_cache=True):
   :param file_path: Input midi file
   :param output: The base path to store the files in
   :param use_cache: Whether to use cached melody notes
-  :return: None
+  :return: PrettyMidi(melody), PrettyMidi(accompaniment)
   """
   pm_original = pretty_midi.PrettyMIDI(midi_file=file_path)
   # pm_original.remove_invalid_notes()  # optional
@@ -185,6 +182,8 @@ def extract_from_midi_to_midi(file_path, output, use_cache=True):
   # out_path_accomp = os.path.join(output, f'{Path(file_path).stem}_accompaniment_{time_thresh_start};{time_thresh_end}_{pitch_thresh}.mid')
   pm_original.write(out_path_accomp)
   print('Accompaniment result written to', out_path_accomp)
+
+  return pm_melody, pm_original
 
 
 def compute_melody_notes(pm_original, use_fluidsynth=True):

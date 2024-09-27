@@ -7,6 +7,8 @@ __pycache__
 metrics.csv
 .DS_Store
 lightning_logs
-tmp
+tmp/
+temp/
 .venv
 .hypothesis
+preprocessed*
