@@ -1,5 +1,5 @@
 import argparse
-import os, glob
+import os, glob, pathlib #, shutil
 from statistics import NormalDist
 import pandas as pd
 import numpy as np
@@ -27,6 +27,7 @@ CHORDS = [f"{k}:{q}" for k in keys for q in qualities] + ['N:N']
 def parse_args():
   parser = argparse.ArgumentParser()
   parser.add_argument('--samples_dir', type=str, default="./samples")
+  parser.add_argument('--dataset_dir', type=str, default="../clean_midi")
   parser.add_argument('--output_file', type=str, default="./metrics.csv")
   parser.add_argument('--max_samples', type=int, default=1024)
   args = parser.parse_args()
@@ -37,13 +38,22 @@ def get_group_id(file):
   name = os.path.basename(file)
   return name.split('.')[0]
 
-def get_file_groups(path, max_samples=1024):
+
+# Only if dataset has structure like artist/track_name.mid
+# And generated track like artist - track.mid
+def _adjust_file_path(filename, dataset_dir):
+  artist, track = filename.split(' - ', maxsplit=1)
+  return os.path.join(dataset_dir, artist, track)
+
+def get_file_groups(path, dataset_dir, max_samples=1024):
   # change this depending on file structure of generated samples
   files = glob.glob(os.path.join(path, '*.mid'), recursive=True)
   assert len(files), f"provided directory was empty: {path}"
 
   samples = sorted(files)
-  origs = sorted([os.path.join(path, 'ground_truth', os.path.basename(file)) for file in files])
+
+  # origs = sorted([os.path.join(path, 'ground_truth', os.path.basename(file)) for file in files])
+  origs = sorted([_adjust_file_path(os.path.basename(file), dataset_dir) for file in files])
   pairs = list(zip(origs, samples))
 
   pairs = list(filter(lambda pair: os.path.exists(pair[0]), pairs))
@@ -52,8 +62,11 @@ def get_file_groups(path, max_samples=1024):
 
   groups = dict()
   for orig, sample in pairs:
-    sample_id = get_group_id(sample)
-    orig_id = get_group_id(orig)
+    # sample_id = get_group_id(sample)
+    sample_id = os.path.basename(sample).replace(' - ', '/', 1)
+    # orig_id = get_group_id(orig)
+    orig_id = os.path.join(*pathlib.Path(orig).parts[-2:])
+
     assert sample_id == orig_id, f"Sample id doesn't match original id: {sample} and {orig}"
     if sample_id not in groups:
       groups[sample_id] = list()
@@ -166,10 +179,9 @@ def overlapping_area(mu1, sigma1, mu2, sigma2, eps=0.01):
   return NormalDist(mu=mu1, sigma=sigma1).overlap(NormalDist(mu=mu2, sigma=sigma2))
 
 
-# FIXME File in ground_truth is currently not the original file -> Copy there from un-preprocessed dataset
 def main():
   args = parse_args()
-  file_groups = get_file_groups(args.samples_dir, max_samples=args.max_samples)
+  file_groups = get_file_groups(args.samples_dir, args.dataset_dir, max_samples=args.max_samples)
 
   metrics = pd.DataFrame()
   for sample_id, group in enumerate(file_groups):
@@ -177,16 +189,24 @@ def main():
     micro_metrics = pd.DataFrame()
     for orig_file, sample_file in group:
       print(f"[info] Group {sample_id+1}/{len(file_groups)} | original: {orig_file} | sample: {sample_file}")
-      orig = ir.InputRepresentation(orig_file)
+      try:
+        orig = ir.InputRepresentation(orig_file, strict=True)
 
-      # If separate melody
-      # process_folder(args.samples_dir, ) # os.path.join('')
-      # Splits current samples into
-      extract_from_midi_to_midi(sample_file, args.samples_dir)  # os.path.join('')
+        sample = ir.InputRepresentation(sample_file, strict=True)
 
-      sample = ir.InputRepresentation(sample_file)
+        # NOTE This way the descriptions do not contain melody tokens!
+        # However no comparison is needed between them at the moment
+        orig_desc, sample_desc = orig.get_description(), sample.get_description()
+        # To realize this one would have to use orig_file.get_prepr_parts = (prepr_accomp, prepr_mel)
+        # And split sample here:
+        # splitted = extract_from_midi_to_midi(sample_path, None, use_cache=False)
+        # sample = InRep(splitted[1], splitted[0])
+      except ValueError as err:
+        print(f'Value Error encountered with tuple ({orig_file},{sample_file})')
+        print('Details:', str(err))
+        print('Skipping')
+        continue
 
-      orig_desc, sample_desc = orig.get_description(), sample.get_description()
       if len(orig_desc) == 0 or len(sample_desc) == 0:
         print("[warning] empty sample! skipping")
         continue
