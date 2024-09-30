@@ -123,7 +123,7 @@ def reconstruct_sample(model, batch,
 
   if output_dir:
     if make_mashups:
-      output_dir = os.path.join(output_dir, '_mashups')
+      output_dir = output_dir + '_mashups'
     os.makedirs(os.path.join(output_dir, 'ground_truth'), exist_ok=True)
     for pm, pm_hat, file in zip(pms, pms_hat, batch['files']):
       out_name = file.replace('_accompaniment.mid', '.mid')
