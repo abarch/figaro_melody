@@ -6,7 +6,9 @@ import pytorch_lightning as pl
 import math
 import os
 import pickle
+from pathlib import Path
 
+from utils import create_mashup_pairs
 from input_representation import InputRepresentation
 from vocab import RemiVocab, DescriptionVocab
 from constants import (
@@ -203,7 +205,8 @@ class MidiDataset(IterableDataset):
                bar_token_idx=2,
                use_cache=True,
                print_errors=False,
-               do_train_vae_accomp=False):
+               do_train_vae_accomp=False,
+               do_generate_mashups=False):
     self.files = midi_files
     self.group_bars = group_bars
     self.max_len = max_len
@@ -211,7 +214,7 @@ class MidiDataset(IterableDataset):
     self.max_positions = max_positions
     self.max_bars_per_context = max_bars_per_context
     self.max_contexts_per_file = max_contexts_per_file
-    self.use_cache = use_cache
+    self.use_cache = use_cache and not do_generate_mashups  # if mashups should be made, no cached data must be used or stored
     self.print_errors = print_errors
 
     self.vocab = RemiVocab()
@@ -226,9 +229,9 @@ class MidiDataset(IterableDataset):
 
     self.separated_melody_present = False if description_options is None else description_options['separated_melody']
     self.desc_vocab = DescriptionVocab(add_melody_tokens=self.separated_melody_present)
-    # self.vocab = RemiVocab(add_melody_tokens=self.separated_melody_present)
 
     self.do_train_vae_accomp = do_train_vae_accomp
+    self.do_generate_mashups = do_generate_mashups
 
     self.bar_token_mask = bar_token_mask
     self.bar_token_idx = bar_token_idx
@@ -254,9 +257,16 @@ class MidiDataset(IterableDataset):
 
     split_len = len(self.split)
 
+    if self.do_generate_mashups:
+      split_mashup = create_mashup_pairs(self.split)
+
     for i in range(split_len):
       try:
-        current_file = self.load_file(self.split[i])
+        # Choose random file as melody instead of the one coming from the same file
+        if self.do_generate_mashups:
+          current_file = self.load_file(file=split_mashup[i][0], melody_file_override=split_mashup[i][1])
+        else:
+          current_file = self.load_file(self.split[i])  # current_file = sample
       except ValueError as err:
         if self.print_errors:
           print(err)
@@ -330,9 +340,15 @@ class MidiDataset(IterableDataset):
         if self.max_len > 0:
           src = src[:self.max_len + 1]
 
+        if self.do_generate_mashups:
+          accomp_name = split_mashup[i][0]
+          mel_name = split_mashup[i][1]
+          file_name = f'{Path(accomp_name).stem[:100]}_WITH_MEL_{Path(mel_name).stem[:100]}.mid'
+        else:
+          file_name = os.path.basename(self.split[i])
         x = {
           'input_ids': src,
-          'file': os.path.basename(self.split[i]),
+          'file': file_name,
           'bar_ids': b_ids,
           'position_ids': p_ids,
         }
@@ -428,7 +444,7 @@ class MidiDataset(IterableDataset):
     }
     return [token for token in desc if len(token.split('_')) == 0 or valid_keys[token.split('_')[0]]]
 
-  def load_file(self, file):
+  def load_file(self, file, melody_file_override=None):
     name = os.path.basename(file)
     if self.separated_melody_present or self.do_train_vae_accomp:
       name = name.replace('_accompaniment.mid', '.mid')
@@ -448,7 +464,10 @@ class MidiDataset(IterableDataset):
         if self.separated_melody_present or self.do_train_vae_accomp:  # Needs to hold for every file if True!
           # if the predominant melody is separated, load the appropriate file as well
           # if file ends with _accompaniment, add its melody as second file
-          if file.endswith('_accompaniment.mid'):
+          if self.do_generate_mashups:
+            melody_file = melody_file_override
+            print(f'+++ Melody override with {melody_file} +++')
+          elif file.endswith('_accompaniment.mid'):
             melody_file = file.replace('_accompaniment.mid', '_melody.mid')
           # if file ends with _melody, use it as "melody_file" and fetch accompaniment file as "file"
           elif file.endswith('_melody.mid'):

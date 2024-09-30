@@ -1,5 +1,6 @@
 import torch
 from torch.nn.utils.rnn import pad_sequence
+import random
 
 def combine_batches(batches, bars_per_sequence=8, description_flavor='none', device=None):
   if device is None:
@@ -112,3 +113,20 @@ def medley_iterator(dl, n_pieces=2, n_bars=8, description_flavor='none'):
       yield batch
   except StopIteration:
     return
+
+
+def create_mashup_pairs(accompaniments):
+  melodies = []
+
+  for filename in accompaniments:
+      melodies.append(filename.replace('_accompaniment.mid', '_melody.mid'))
+
+  random.shuffle(melodies)
+
+  # Create tuples of melodies and shuffled accompaniments for random mashup combinations
+  tuples = []
+  for accomp in accompaniments:
+    melody = melodies.pop() if melodies else None
+    tuples.append((accomp, melody))
+
+  return tuples

@@ -27,6 +27,7 @@ def parse_args():
   parser.add_argument('--max_bars', type=int, default=32)
   parser.add_argument('--make_medleys', type=bool, default=False)
   parser.add_argument('--n_medley_pieces', type=int, default=2)
+  parser.add_argument('--make_mashups', type=bool, default=False)
   parser.add_argument('--n_medley_bars', type=int, default=16)
   parser.add_argument('--batch_size', type=int, default=1)
   parser.add_argument('--verbose', type=int, default=2)
@@ -82,6 +83,7 @@ def reconstruct_sample(model, batch,
   max_iter=-1, 
   max_bars=-1,
   verbose=0,
+  make_mashups=False
 ):
   batch_size, seq_len = batch['input_ids'].shape[:2]
 
@@ -120,6 +122,8 @@ def reconstruct_sample(model, batch,
       n_fatal += 1
 
   if output_dir:
+    if make_mashups:
+      output_dir = os.path.join(output_dir, '_mashups')
     os.makedirs(os.path.join(output_dir, 'ground_truth'), exist_ok=True)
     for pm, pm_hat, file in zip(pms, pms_hat, batch['files']):
       out_name = file.replace('_accompaniment.mid', '.mid')
@@ -178,14 +182,15 @@ def main():
     description_flavor=model.description_flavor,
     description_options=description_options,
     max_bars=model.context_size,
-    vae_module=vae_module
+    vae_module=vae_module,
+    do_generate_mashups=args.make_mashups  # force random association between melodies and accompaniments
   )
 
   coll = SeqCollator(context_size=-1)
   dl = DataLoader(dataset, batch_size=args.batch_size, collate_fn=coll)
 
   if args.make_medleys:
-    dl = medley_iterator(dl, 
+    dl = medley_iterator(dl,
       n_pieces=args.n_medley_pieces, 
       n_bars=args.n_medley_bars, 
       description_flavor=model.description_flavor
@@ -198,6 +203,7 @@ def main():
         max_iter=args.max_iter, 
         max_bars=max_bars,
         verbose=args.verbose,
+        make_mashups=args.make_mashups
       )
 
 if __name__ == '__main__':

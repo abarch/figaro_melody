@@ -88,8 +88,8 @@ class InputRepresentation():
     return ret_list
 
   def _merge_arrays(self, accompaniment, melody):
-    ret_list = np.concatenate((melody, accompaniment), axis=0)
-    ret_list = np.unique(ret_list, axis=0)
+    ret_list = np.concatenate((melody, accompaniment), axis=1)
+    ret_list = np.unique(ret_list, axis=1)
     ret_sorted_unique = ret_list[np.argsort(ret_list[:, 0])]
     return ret_sorted_unique
 
