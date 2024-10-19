@@ -21,8 +21,6 @@ from constants import (
   MEAN_VELOCITY_KEY,
   MEAN_DURATION_KEY,
   MELODY_INSTRUMENT_KEY,
-  MELODY_NOTE_KEY,
-  # NOTE_TYPE_KEY,
 
   # discretization parameters
   DEFAULT_POS_PER_QUARTER,
@@ -395,7 +393,7 @@ class InputRepresentation():
   def tick_to_position(self, tick):
     return round(tick / self.pm.resolution * DEFAULT_POS_PER_QUARTER)
 
-  def _process_note_item_to_events(self, item):
+  def _process_note_item_to_events(self, item, instrument_key=INSTRUMENT_KEY):
     events = []
     # instrument
     if item.instrument == 'drum':
@@ -403,7 +401,7 @@ class InputRepresentation():
     else:
       name = pretty_midi.program_to_instrument_name(item.instrument)
     events.append(Event(
-      name=INSTRUMENT_KEY,
+      name=instrument_key,
       time=item.start,
       value=name,
       text='{}'.format(name)))
@@ -654,32 +652,19 @@ class InputRepresentation():
 
       if self.separated_melody:
         melody = [item for item in self.groups[i][1:-1] if item.name == 'Melody']
-        mel_instr_events = set([])  # List every instrument name once
+        # mel_instr_events = set([])  # List every instrument name once
         mel_note_events = []
-        for mel_note in melody:
-          mel_instr_events.add(Event(
-            name=MELODY_INSTRUMENT_KEY,
-            time=None,
-            value=pretty_midi.program_to_instrument_name(mel_note.instrument),
-            text=pretty_midi.program_to_instrument_name(mel_note.instrument)
-          ))
+        for idx, mel_note in enumerate(melody):
 
-          # Fit velocity and duration into bin values to reduce vocab size
-          vel_idx = np.argmin(abs(DEFAULT_VELOCITY_BINS - mel_note.velocity))
-          velocity = DEFAULT_VELOCITY_BINS[vel_idx]
-          dur_idx = np.argmin(abs(DEFAULT_DURATION_BINS - (mel_note.end - mel_note.start)))
-          duration = DEFAULT_DURATION_BINS[dur_idx]
-
-          # Melody note value get saved as a single Event with shape pitch;velocity;duration
-          mel_note_value = '{};{};{}'.format(mel_note.pitch, velocity, duration)
           mel_note_events.append(Event(
-            name=MELODY_NOTE_KEY,
-            time=None,
-            value=mel_note_value,
-            text=mel_note_value
-          ))
+            name=POSITION_KEY,
+            time=mel_note.start,
+            value='{}'.format(idx),
+            text=str(idx)))
+
+          mel_note_events.extend(self._process_note_item_to_events(mel_note, instrument_key=MELODY_INSTRUMENT_KEY))
         # List instruments first, melody notes afterwards
-        events.extend(mel_instr_events)
+        # events.extend(mel_instr_events)
         events.extend(mel_note_events)
     return [f'{e.name}_{e.value}' for e in events]
 

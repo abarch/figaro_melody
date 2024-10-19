@@ -14,7 +14,8 @@ from vocab import RemiVocab, DescriptionVocab
 from constants import (
   PAD_TOKEN, BOS_TOKEN, EOS_TOKEN, BAR_KEY, POSITION_KEY,
   TIME_SIGNATURE_KEY, INSTRUMENT_KEY, CHORD_KEY,
-  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY, MELODY_NOTE_KEY, MELODY_INSTRUMENT_KEY
+  NOTE_DENSITY_KEY, MEAN_PITCH_KEY, MEAN_VELOCITY_KEY, MEAN_DURATION_KEY, MELODY_INSTRUMENT_KEY,
+  PITCH_KEY, VELOCITY_KEY, DURATION_KEY
 )
 
 
@@ -440,7 +441,10 @@ class MidiDataset(IterableDataset):
       MEAN_VELOCITY_KEY: meta,
       MEAN_DURATION_KEY: meta,
       MELODY_INSTRUMENT_KEY: separated_melody,
-      MELODY_NOTE_KEY: separated_melody
+      POSITION_KEY: separated_melody,
+      PITCH_KEY: separated_melody,
+      VELOCITY_KEY: separated_melody,
+      DURATION_KEY: separated_melody
     }
     return [token for token in desc if len(token.split('_')) == 0 or valid_keys[token.split('_')[0]]]
 
