@@ -131,7 +131,9 @@ def create_mashup_pairs(accompaniments, match_key_signatures=False):
     if match_key_signatures:
       pm_accomp = pretty_midi.PrettyMIDI(accomp)
       pm_melody = pretty_midi.PrettyMIDI(melody)
-      if pm_accomp.key_signature_changes[0] == pm_melody.key_signature_changes[0]:
+      if len(pm_accomp.key_signature_changes) == 0 or len(pm_melody.key_signature_changes) == 0:
+        continue
+      if pm_accomp.key_signature_changes[0].key_number == pm_melody.key_signature_changes[0].key_number:
         tuples.append((accomp, melody))
     else:
       tuples.append((accomp, melody))
