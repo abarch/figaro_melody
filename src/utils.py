@@ -1,3 +1,4 @@
+import pretty_midi
 import torch
 from torch.nn.utils.rnn import pad_sequence
 import random
@@ -115,7 +116,7 @@ def medley_iterator(dl, n_pieces=2, n_bars=8, description_flavor='none'):
     return
 
 
-def create_mashup_pairs(accompaniments):
+def create_mashup_pairs(accompaniments, match_key_signatures=False):
   melodies = []
 
   for filename in accompaniments:
@@ -127,6 +128,12 @@ def create_mashup_pairs(accompaniments):
   tuples = []
   for accomp in accompaniments:
     melody = melodies.pop() if melodies else None
-    tuples.append((accomp, melody))
+    if match_key_signatures:
+      pm_accomp = pretty_midi.PrettyMIDI(accomp)
+      pm_melody = pretty_midi.PrettyMIDI(melody)
+      if pm_accomp.key_signature_changes[0] == pm_melody.key_signature_changes[0]:
+        tuples.append((accomp, melody))
+    else:
+      tuples.append((accomp, melody))
 
   return tuples
